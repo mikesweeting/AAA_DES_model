@@ -663,6 +663,9 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 	if ("censoringTime" %in% names(v3))
 		scheduledEvents["censored"] <- v3$censoringTime
 	
+	## Set numberMonitor = number of times in each size group that monitoring has occurred. Include large AAA group here as well
+	numberMonitor <- rep(0,length(v1other$aortaDiameterThresholds)+1)
+	
 	repeat {
 		# Make sure that all the scheduled times are different (exclude NAs).
 		if (!allDifferent(scheduledEvents)) {
@@ -718,8 +721,6 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 						eventTime, v1other$thresholdForIncidentalDetection, v3, 
 						v2$rateOfIncidentalDetection)
 			} else if (aortaSizeGroup < length(v1other$aortaDiameterThresholds)) {
-			  ## Set numberMonitor = number of times in each size group that monitoring has occurred
-			  # numberMonitor <- rep(0,length(v1other$aortaDiameterThresholds))
 			  scheduledEvents["monitor"] <- 
 						eventTime + v1other$monitoringIntervals[aortaSizeGroup+1] ## Updated MS. 07/02/19
 				scheduledEvents["dropout"] <- generateDropoutTime( 
@@ -740,24 +741,28 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			aortaSizeGroup <- findInterval(aortaSize, 
 					v1other$aortaDiameterThresholds)
 			## Add one to the times patient has been monitored in this size group
-			#numberMonitor[aortaSizeGroup + 1] <- numberMonitor[aortaSizeGroup + 1] + 1
+			numberMonitor[aortaSizeGroup + 1] <- numberMonitor[aortaSizeGroup + 1] + 1
 
 			## If numberMonitor <= maxNumberMonitor then schedule another monitor else discharge from surveillance
-			#if (numberMonitor[aortaSizeGroup + 1] <= maxNumberMonitor)
-			if (aortaSizeGroup == 0) {  # they are below lowest threshold
-				eventHistory <- addEvent(eventHistory, 
-						"aortaDiameterBelowThreshold", eventTime)
-				scheduledEvents["monitor"] <- 
-						eventTime + v1other$monitoringIntervals[1]
-			} else if (aortaSizeGroup < length(v1other$aortaDiameterThresholds)) {
-				scheduledEvents["monitor"] <- 
-						eventTime + v1other$monitoringIntervals[aortaSizeGroup + 1] ## updated MS 07/02/19
-			} else {
-				scheduledEvents["consultation"] <- 
-						eventTime + v1other$waitingTimeToConsultation
-				scheduledEvents["dropout"] <- NA
-			}
-			
+			## Last group has Inf number of monitors. This corresponds with large AAA group
+			if (numberMonitor[aortaSizeGroup + 1] <= c(v1other$maxNumberMonitor, Inf)[aortaSizeGroup + 1]){
+			  if (aortaSizeGroup == 0) {  # they are below lowest threshold
+			    eventHistory <- addEvent(eventHistory, 
+			                             "aortaDiameterBelowThreshold", eventTime)
+			    scheduledEvents["monitor"] <- 
+			      eventTime + v1other$monitoringIntervals[1]
+			  } else if (aortaSizeGroup < length(v1other$aortaDiameterThresholds)) {
+			    scheduledEvents["monitor"] <- 
+			      eventTime + v1other$monitoringIntervals[aortaSizeGroup + 1] ## updated MS 07/02/19
+			  } else {
+			    scheduledEvents["consultation"] <- 
+			      eventTime + v1other$waitingTimeToConsultation
+			    scheduledEvents["dropout"] <- NA
+			  }
+			} else { ## added a discharge event: MS 07/02/19
+			  scheduledEvents["discharged"] <- eventTime
+			  scheduledEvents["dropout"] <- NA
+			}			
 		} else if (eventType=="consultation") {
 			# Measure the aorta diameter using CT, and if the result is less
 			# than thresholdForSurgery then return to monitoring.  
@@ -969,10 +974,10 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			scheduledEvents["dropout"] <- generateDropoutTime( 
 					v2$rateOfDropoutFromMonitoring, eventTime)
 		
-		} else if (eventType == "dropout") {
+		} else if (eventType == "dropout" | eventType == "discharged") {
 			scheduledEvents["monitor"] <- NA
 			## Reset numberMonitor to zero so that if they get incidentally detected they start afresh
-			numberMonitor <- rep(0,length(v1other$aortaDiameterThresholds))
+			numberMonitor <- rep(0,length(v1other$aortaDiameterThresholds)+1)
 			
 			scheduledEvents["incidentalDetection"] <- 
 					generateIncidentalDetectionTime(

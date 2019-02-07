@@ -3,6 +3,8 @@
 rm(list=ls())
 
 source("functions/DES Model.R")
+source("functions/shiny_output_functions.R")
+
 # Parameters.
 source("input/parsForWomen30years_ref_model.R") 
 
@@ -34,6 +36,10 @@ result$meanQuantities
 ## treatmentGroup lifeYears    qalys      cost discountedLifeYears discountedQalys discountedCost
 ## noScreening  20.05352 14.89450  82.87577            13.64510        10.23625       47.92276
 ## screening    20.04199 14.88608 104.86951            13.63742        10.23063       72.18988
+
+sum(unlist(lapply(1:length(result$eventHistories),singleEvent,result,treatmentGroup="screening",event="discharged")))
+result$eventHistories[which(lapply(1:length(result$eventHistories),singleEvent,result,treatmentGroup="screening",event="discharged")==1)]
+
 
 ## TO DO
 ## 1. CURRENTLY WORKS WITH ONLY 1 AGE - DO WE EVEN WANT TO CONSIDER AN AGE RANGE?
