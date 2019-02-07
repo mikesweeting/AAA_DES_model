@@ -111,6 +111,10 @@ dimnames(v1distributions$covarianceForRuptureParameters) <-
 v1other$aortaDiameterThresholds <- c(3.0, 4.5, 5.5)
 v1other$monitoringIntervals <- c(1, 1, 0.25) ## MS. updated so first interval relates to those normal (e.g. below first threshold)
 v1other$maxNumberMonitor <- c(Inf, Inf, Inf) ## maximum number of monitorings in each size group before discharge
+# Sub-AAA set-up
+#v1other$aortaDiameterThresholds <- c(2.5, 3.0, 4.5, 5.5)
+#v1other$monitoringIntervals <- c(Inf, 5, 1, 0.25) ## MS. updated so first interval relates to those normal (e.g. below first threshold)
+#v1other$maxNumberMonitor <- c(1, 2, Inf, Inf) ## maximum number of monitorings in each size group before discharge
 v1other$monitoringIntervalFollowingContraindication <- 0.5
 
 # Dropout rate from surveillance

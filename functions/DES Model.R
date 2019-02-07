@@ -715,6 +715,9 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			# Find what interval aortaSize is in & schedule events accordingly.
 			aortaSizeGroup <- findInterval(aortaSize, 
 					v1other$aortaDiameterThresholds)
+			## Add one to the times patient has been screened or monitored in this size group
+			numberMonitor[aortaSizeGroup + 1] <- numberMonitor[aortaSizeGroup + 1] + 1
+			
 			if (aortaSizeGroup == 0 || v3$probOfNonvisualization) {  ## Assumes that first group is screened normal group
 				scheduledEvents["incidentalDetection"] <- 
 						generateIncidentalDetectionTime(
@@ -740,12 +743,12 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			}
 			aortaSizeGroup <- findInterval(aortaSize, 
 					v1other$aortaDiameterThresholds)
-			## Add one to the times patient has been monitored in this size group
+			## Add one to the times patient has been screened or monitored in this size group
 			numberMonitor[aortaSizeGroup + 1] <- numberMonitor[aortaSizeGroup + 1] + 1
 
 			## If numberMonitor <= maxNumberMonitor then schedule another monitor else discharge from surveillance
 			## Last group has Inf number of monitors. This corresponds with large AAA group
-			if (numberMonitor[aortaSizeGroup + 1] <= c(v1other$maxNumberMonitor, Inf)[aortaSizeGroup + 1]){
+			if (numberMonitor[aortaSizeGroup + 1] < c(v1other$maxNumberMonitor, Inf)[aortaSizeGroup + 1]){
 			  if (aortaSizeGroup == 0) {  # they are below lowest threshold
 			    eventHistory <- addEvent(eventHistory, 
 			                             "aortaDiameterBelowThreshold", eventTime)
