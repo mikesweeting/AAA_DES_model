@@ -28,7 +28,7 @@
 
 # Predefined outcomes from the model are death caused by AAA, life-years, QALYs, 
 # costs, and the incremental cost-effectiveness ratio (ICER). Both costs and 
-# life-years are discounted at 3·5% per annum (appendix). Input parameters for 
+# life-years are discounted at 3?5% per annum (appendix). Input parameters for 
 # women have been obtained from a combination of literature reviews, clinical 
 # trial data, bespoke hospital datasets, and analysis of routine and registry 
 # data sources. Further details included in [Sweeting et al. Should we 
@@ -712,14 +712,16 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			# Find what interval aortaSize is in & schedule events accordingly.
 			aortaSizeGroup <- findInterval(aortaSize, 
 					v1other$aortaDiameterThresholds)
-			if (aortaSizeGroup == 0 || v3$probOfNonvisualization) { 
+			if (aortaSizeGroup == 0 || v3$probOfNonvisualization) {  ## Assumes that first group is screened normal group
 				scheduledEvents["incidentalDetection"] <- 
 						generateIncidentalDetectionTime(
 						eventTime, v1other$thresholdForIncidentalDetection, v3, 
 						v2$rateOfIncidentalDetection)
 			} else if (aortaSizeGroup < length(v1other$aortaDiameterThresholds)) {
-				scheduledEvents["monitor"] <- 
-						eventTime + v1other$monitoringIntervals[aortaSizeGroup]
+			  ## Set numberMonitor = number of times in each size group that monitoring has occurred
+			  # numberMonitor <- rep(0,length(v1other$aortaDiameterThresholds))
+			  scheduledEvents["monitor"] <- 
+						eventTime + v1other$monitoringIntervals[aortaSizeGroup+1] ## Updated MS. 07/02/19
 				scheduledEvents["dropout"] <- generateDropoutTime( 
 						v2$rateOfDropoutFromMonitoring, eventTime)
 			} else {
@@ -737,14 +739,19 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			}
 			aortaSizeGroup <- findInterval(aortaSize, 
 					v1other$aortaDiameterThresholds)
-			if (aortaSizeGroup == 0) {  # they are sub-aneurysmal
+			## Add one to the times patient has been monitored in this size group
+			#numberMonitor[aortaSizeGroup + 1] <- numberMonitor[aortaSizeGroup + 1] + 1
+
+			## If numberMonitor <= maxNumberMonitor then schedule another monitor else discharge from surveillance
+			#if (numberMonitor[aortaSizeGroup + 1] <= maxNumberMonitor)
+			if (aortaSizeGroup == 0) {  # they are below lowest threshold
 				eventHistory <- addEvent(eventHistory, 
 						"aortaDiameterBelowThreshold", eventTime)
 				scheduledEvents["monitor"] <- 
 						eventTime + v1other$monitoringIntervals[1]
 			} else if (aortaSizeGroup < length(v1other$aortaDiameterThresholds)) {
 				scheduledEvents["monitor"] <- 
-						eventTime + v1other$monitoringIntervals[aortaSizeGroup]
+						eventTime + v1other$monitoringIntervals[aortaSizeGroup + 1] ## updated MS 07/02/19
 			} else {
 				scheduledEvents["consultation"] <- 
 						eventTime + v1other$waitingTimeToConsultation
@@ -771,7 +778,7 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 				eventHistory <- addEvent(eventHistory, 
 						"decideOnReturnToMonitoring", eventTime)
 				scheduledEvents["monitor"] <- 
-						eventTime + v1other$monitoringIntervals[aortaSizeGroup]
+						eventTime + v1other$monitoringIntervals[aortaSizeGroup + 1] ## updated MS 07/02/19
 				scheduledEvents["dropout"] <- generateDropoutTime( 
 						v2$rateOfDropoutFromMonitoring, eventTime) 
 
@@ -964,6 +971,9 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 		
 		} else if (eventType == "dropout") {
 			scheduledEvents["monitor"] <- NA
+			## Reset numberMonitor to zero so that if they get incidentally detected they start afresh
+			numberMonitor <- rep(0,length(v1other$aortaDiameterThresholds))
+			
 			scheduledEvents["incidentalDetection"] <- 
 					generateIncidentalDetectionTime(
 					eventTime, v1other$thresholdForIncidentalDetection, v3, 
@@ -2348,19 +2358,20 @@ generateDropoutTime <- function(rateOfDropoutFromMonitoring,
 setUnspecifiedElementsOfv0 <- function(v0) {
   # Create a list that contains the default values. 
 	defaults <- list(
-			treatmentGroups=c("noScreening", "screening"),
+			treatmentGroups=c("noScreening", "screening"), ## THIS SHOULD NEVER BE CHANGED AS CURRENTLY CODE DOES NOT WORK WITH ANY OTHER OPTIONS
 			namesOfQuantities=c("lifeYears", "qalys", "cost", 
 					"discountedLifeYears", "discountedQalys", "discountedCost"),
 			showEventHistories=FALSE,
 			returnMeanQuantities=TRUE,
-			returnEventHistories=FALSE,
+			returnEventHistories=TRUE,
 			returnAllPersonsQuantities=FALSE,
-			recordSizes=FALSE,
-			method="parallel",  
+			recordSizes=TRUE,
+			method="serial",  
 			verbose=TRUE,
 			randomSeed=2,
 			numberOfPersons=1e3,
-			numberOfParameterIterations=5
+			numberOfParameterIterations=5,
+			numberOfProcesses=detectCores()-1
 	)
 	for (i in 1:length(defaults)) {
 		varName <- names(defaults)[i]
@@ -2591,8 +2602,8 @@ checkV0andV1other <- function(v0, v1other) {
 checkV1other <- function(v1other) {
 	# Check v1other$aortaDiameterThresholds and v1other$monitoringIntervals.
 	if (length(v1other$aortaDiameterThresholds) != 
-			length(v1other$monitoringIntervals) + 1)
-		stop("v1other$aortaDiameterThresholds must be exactly one longer than ",
+			length(v1other$monitoringIntervals)) ## updated MS 07/02/19
+		stop("v1other$aortaDiameterThresholds must be exactly the same length as ",
 				"v1other$monitoringIntervals")
 	if (!identical(v1other$aortaDiameterThresholds, 
 			sort(v1other$aortaDiameterThresholds)))

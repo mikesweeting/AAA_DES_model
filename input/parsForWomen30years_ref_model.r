@@ -2,10 +2,10 @@
 # Parameters for the women 30 year reference models
 ################################################################################
 
-if (!exists("v0")) v0 <- compactList() 
-if (!exists("v1distributions")) v1distributions <- compactList() 
-if (!exists("v1other")) v1other <- compactList() 
-if (!exists("v2")) v2 <- compactList() 
+v0 <- compactList() 
+v1distributions <- compactList() 
+v1other <- compactList() 
+v2 <- compactList() 
 
 ################################################################################
 # MISCELLANEOUS
@@ -109,7 +109,8 @@ dimnames(v1distributions$covarianceForRuptureParameters) <-
 
 # Surveillance intervals
 v1other$aortaDiameterThresholds <- c(3.0, 4.5, 5.5)
-v1other$monitoringIntervals <- c(1, 0.25)
+v1other$monitoringIntervals <- c(1, 1, 0.25) ## MS. updated so first interval relates to those normal (e.g. below first threshold)
+v1other$maxNumberMonitor <- c(Inf, Inf, Inf) ## maximum number of monitorings in each size group before discharge
 v1other$monitoringIntervalFollowingContraindication <- 0.5
 
 # Dropout rate from surveillance
