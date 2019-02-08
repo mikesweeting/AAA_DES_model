@@ -31,11 +31,15 @@ targetGroup <- data.frame(sex="Male", age=65, smoker=1)
 result <- processPersons(v0, v1other, v2)
 
 result$meanQuantities
-##
-## quantity
-## treatmentGroup lifeYears    qalys      cost discountedLifeYears discountedQalys discountedCost
-## noScreening  20.05352 14.89450  82.87577            13.64510        10.23625       47.92276
-## screening    20.04199 14.88608 104.86951            13.63742        10.23063       72.18988
+# quantity
+# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys
+# noScreening  20.10800 14.93558 36.35599            13.68607        10.26736
+# screening    20.10654 14.93454 34.29114            13.68546        10.26693
+# quantity
+# treatmentGroup discountedCost
+# noScreening       19.22805
+# screening         31.37802
+
 
 sum(unlist(lapply(1:length(result$eventHistories),singleEvent,result,treatmentGroup="screening",event="discharged")))
 result$eventHistories[which(lapply(1:length(result$eventHistories),singleEvent,result,treatmentGroup="screening",event="discharged")==1)]

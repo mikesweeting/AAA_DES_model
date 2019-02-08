@@ -28,13 +28,13 @@ v1other$zeroGrowthDiameterThreshold <- 2.0
 
 # Re-invitation proportion
 v2$probOfRequireReinvitation <- setType(142127/594376, "probability")
-v1distributions$probOfRequireReinvitation <- setType(v2$probOfRequireReinvitation, 
-          "fixed value for probability")
+#v1distributions$probOfRequireReinvitation <- setType(v2$probOfRequireReinvitation, 
+#          "fixed value for probability")
 
 # Attendance proportion
 v2$probOfAttendScreen <- setType(218/300, "probability")
-v1distributions$probOfAttendScreen <- 
-  setType(list(alpha=218, beta=300-218), "beta pars for probability")
+#v1distributions$probOfAttendScreen <- 
+#  setType(list(alpha=218, beta=300-218), "beta pars for probability")
 
 # Non-visualisation proportion
 v2$probOfNonvisualization <- setType(1652/470531, "probability")
@@ -344,3 +344,4 @@ v1other$lifeYearDiscountRate <- 3.5 / 100
 v1other$costDiscountRate <- 3.5 / 100
 
 ################################################################################
+

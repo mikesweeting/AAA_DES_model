@@ -37,6 +37,8 @@
 ################################################################################
 # CONTENTS
 ################################################################################
+# 0) AAA_DES - Wrapper function that runs processPersons, reading in all data from Excel Data Input Spreadsheet
+
 # 1a) processPersons 
 # 1b) processPersonsAboveDiagnosisThreshold
 
@@ -55,6 +57,40 @@
 #7) Output functions
 
 ################################################################################
+
+################################################################################
+# AAA_DES
+AAA_DES <- function(dataFile){
+  ## Input Data for the DES model
+  require(readxl)
+  DESData <- read_excel("input/DES_Data_Input.xlsx", sheet = 2, range="A7:M13", 
+                     col_names = T)
+  DESData <- subset(DESData, !is.na(DESData$varname))
+  v0 <- compactList() 
+  v1distributions <- compactList() 
+  v1other <- compactList() 
+  v2 <- compactList() 
+  ## Assign main values
+  for(i in 1:dim(DESData)[1]){
+    eval(parse(text=paste0(DESData$varname[i],"<- setType(", DESData$Value[i],
+                           ", type =", DESData$type[i], ")")))
+  }
+  ## Assign PSA probability distributions
+  for(i in 1:dim(DESData)[1]){
+    if(DESData$distribution.type[i]=="\"fixed value for probability\""){
+      eval(parse(text=paste0(DESData$distribution.varname[i],"<- setType(", 
+                             DESData$varname[i], ", type =", 
+                             DESData$distribution.type[i], ")")))  
+    }
+    if(DESData$distribution.type[i]=="\"beta pars for probability\""){
+      eval(parse(text=paste0(DESData$distribution.varname[i],
+                             "<- setType(list(alpha=",
+                             DESData$alpha[i], ", beta=", DESData$beta[i], 
+                             "), type =", 
+                             DESData$distribution.type[i], ")")))  
+    }
+  }
+}
 
 ################################################################################
 # 1a) processPersons 
@@ -366,7 +402,7 @@ processOnePair <- function(personNumber, v0, v1other, v2) {
 	)
 	
 	# Generate boolean variables (v3) for v2 elements of type "probability". 
-	for (elementName in names(v2)) {
+	for (elementName in sort(names(v2))) {
 		if (elementName %in% namesOfProbVarsForSurvivalModel) next
 		v2element <- v2[[elementName]]
 		if (getType(v2element) == "probability")
