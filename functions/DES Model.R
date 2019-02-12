@@ -89,6 +89,13 @@ AAA_DES <- function(dataFile){
                              "), type =", 
                              DESData$distribution.type[i], ")")))  
     }
+    if(DESData$distribution.type[i]=="\"normal distribution for logit prevalence\""){
+      eval(parse(text=paste0(DESData$distribution.varname[i],
+                             "<- setType(list(mean=",
+                             DESData$mean[i], ", variance=", DESData$sd[i]^2, 
+                             "), type =", 
+                             DESData$distribution.type[i], ")")))  
+    }
   }
 }
 
@@ -120,10 +127,6 @@ AAA_DES <- function(dataFile){
 ################################################################################
 processPersons <- function(v0, v1other, v2) {
 	
-	
-	cat("processPersons\n")
-	cat("probOfAaaDeathInInitialPeriodAfterElectiveOpenSurgery:\n")
-	print(v2$probOfAaaDeathInInitialPeriodAfterElectiveOpenSurgery)
 	
 	suppressWarnings(suppressMessages(require(doParallel)))
 	
@@ -1623,6 +1626,7 @@ psa <- function(v0, v1other, v1distributions, v2values) {
 	# Set elements of v0 as needed for PSA. 
 	v0 <- setUnspecifiedElementsOfv0(v0)  
 	v0$returnMeanQuantities <- TRUE
+	v0$returnEventHistories <- FALSE
 	v0$returnAllPersonsQuantities <- FALSE
 	v0$showEventHistories <- FALSE
 	v0$verbose <- FALSE 
@@ -1722,6 +1726,8 @@ psa <- function(v0, v1other, v1distributions, v2values) {
 
 onePsaIteration <- function(psaIterationNumber, v0, v1other, 
 		v2values) {
+  cat(paste0("PSA iteration ", psaIterationNumber, "\n"))
+  
 	# Get v2, the values of the uncertain global variables, and check it.
 	if (is.null(v2values)) 
 	    stop("INTERNAL ERROR: v2values should be generated in psa ",
@@ -1747,7 +1753,7 @@ generateV2 <- function(v1distributions) {
 	
 	v2 <- compactList()
 	
-	for (elementName in names(v1distributions)) {
+	for (elementName in sort(names(v1distributions))) {
 		
 		# Get v1element and type. 
 		v1element <- v1distributions[[elementName]]

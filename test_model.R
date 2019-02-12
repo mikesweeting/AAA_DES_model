@@ -29,7 +29,6 @@ targetGroup <- data.frame(sex="Male", age=65, smoker=1)
 ## targeted - If true then baselineDiameters and all parameters are a list with two elements (targeted and notTargeted)
 
 result <- processPersons(v0, v1other, v2)
-
 result$meanQuantities
 # quantity
 # treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys
@@ -39,10 +38,47 @@ result$meanQuantities
 # treatmentGroup discountedCost
 # noScreening       19.22805
 # screening         31.37802
-
-
 sum(unlist(lapply(1:length(result$eventHistories),singleEvent,result,treatmentGroup="screening",event="discharged")))
 result$eventHistories[which(lapply(1:length(result$eventHistories),singleEvent,result,treatmentGroup="screening",event="discharged")==1)]
+
+
+
+psaResult <- psa(v0, v1other, v1distributions)
+psaResult$psaQuantities
+# , , psaIterationNumber = 1
+# 
+# quantity
+# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys discountedCost
+# noScreening  20.38234 15.13479 117.9981            13.85769        10.39256        78.6714
+# screening    20.37787 15.13162 185.6964            13.85568        10.39114       136.1605
+# 
+# , , psaIterationNumber = 2
+# 
+# quantity
+# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys discountedCost
+# noScreening  20.02354 14.87621 45.93064            13.65622        10.24650       28.24466
+# screening    20.01804 14.87230 51.35114            13.65316        10.24433       41.89559
+# 
+# , , psaIterationNumber = 3
+# 
+# quantity
+# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys discountedCost
+# noScreening  20.52723 15.23731 40.80214            13.92178        10.43773       20.47535
+# screening    20.53599 15.24353 70.34241            13.92557        10.44042       49.64941
+# 
+# , , psaIterationNumber = 4
+# 
+# quantity
+# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys discountedCost
+# noScreening  20.27296 15.05948 106.4204            13.81338        10.36319       54.60000
+# screening    20.27416 15.06033  55.1765            13.81381        10.36349       41.19281
+# 
+# , , psaIterationNumber = 5
+# 
+# quantity
+# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys discountedCost
+# noScreening  20.12834 14.95018 35.65125            13.69691        10.27506       20.81372
+# screening    20.12834 14.95018 50.05628            13.69691        10.27506       41.03958
 
 
 ## TO DO

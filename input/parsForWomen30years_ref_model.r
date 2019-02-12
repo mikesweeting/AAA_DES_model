@@ -27,27 +27,27 @@ v1other$zeroGrowthDiameterThreshold <- 2.0
 # SCREENING
 
 # Re-invitation proportion
-v2$probOfRequireReinvitation <- setType(142127/594376, "probability")
+#v2$probOfRequireReinvitation <- setType(142127/594376, "probability")
 #v1distributions$probOfRequireReinvitation <- setType(v2$probOfRequireReinvitation, 
 #          "fixed value for probability")
 
 # Attendance proportion
-v2$probOfAttendScreen <- setType(218/300, "probability")
+#v2$probOfAttendScreen <- setType(218/300, "probability")
 #v1distributions$probOfAttendScreen <- 
 #  setType(list(alpha=218, beta=300-218), "beta pars for probability")
 
 # Non-visualisation proportion
-v2$probOfNonvisualization <- setType(1652/470531, "probability")
-v1distributions$probOfNonvisualization <- setType(v2$probOfNonvisualization, 
-                                        "fixed value for probability")
+#v2$probOfNonvisualization <- setType(1652/470531, "probability")
+#v1distributions$probOfNonvisualization <- setType(v2$probOfNonvisualization, 
+#                                        "fixed value for probability")
 
 # Prevalence proportion
 fileName <- "input/AAA max measurements.csv"
 v1other$baselineDiameters <- read.csv(fileName, comment.char="#")[, c("size", "pw")]
 names(v1other$baselineDiameters) <- c("size", "weight")
-v2$prevalence <- setType(0.0042756, "probability")
-v1distributions$prevalence <- 
-  setType(list(mean=-5.45054, variance=(0.32321)^2), "normal distribution for logit prevalence")
+#v2$prevalence <- setType(0.0042756, "probability")
+#v1distributions$prevalence <- 
+#  setType(list(mean=-5.45054, variance=(0.32321)^2), "normal distribution for logit prevalence")
 
 v1other$prevalenceThreshold<-3.0
 
