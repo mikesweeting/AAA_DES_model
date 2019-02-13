@@ -28,8 +28,18 @@ targetGroup <- data.frame(sex="Male", age=65, smoker=1)
 ## baselineDiameters -- list(targeted, notTargeted), each w
 ## targeted - If true then baselineDiameters and all parameters are a list with two elements (targeted and notTargeted)
 
+dataFile <- "input/DES_Data_Input.xlsx"
+
+v0$numberOfPersons <- 4000
 result <- processPersons(v0, v1other, v2)
 result$meanQuantities
+# N = 4000
+# quantity
+# treatmentGroup lifeYears    qalys      cost discountedLifeYears discountedQalys discountedCost
+# noScreening  20.29572 15.07328  80.07796            13.80255        10.35351       41.54997
+# screening    20.30187 15.07777 112.05991            13.80629        10.35625       75.19093
+
+## N = 1000
 # quantity
 # treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys
 # noScreening  20.10800 14.93558 36.35599            13.68607        10.26736
@@ -38,11 +48,19 @@ result$meanQuantities
 # treatmentGroup discountedCost
 # noScreening       19.22805
 # screening         31.37802
+
+## N=10,000
+## 
+# quantity
+# treatmentGroup lifeYears    qalys      cost discountedLifeYears discountedQalys discountedCost
+# noScreening  20.43834 15.17537  90.51524            13.88279        10.41109       48.58817
+# screening    20.43857 15.17555 121.74456            13.88315        10.41136       80.37521
+
 sum(unlist(lapply(1:length(result$eventHistories),singleEvent,result,treatmentGroup="screening",event="discharged")))
 result$eventHistories[which(lapply(1:length(result$eventHistories),singleEvent,result,treatmentGroup="screening",event="discharged")==1)]
 
 
-
+v0$numberOfPersons <- 1000
 psaResult <- psa(v0, v1other, v1distributions)
 psaResult$psaQuantities
 # , , psaIterationNumber = 1

@@ -118,84 +118,85 @@ v1other$maxNumberMonitor <- c(Inf, Inf, Inf) ## maximum number of monitorings in
 v1other$monitoringIntervalFollowingContraindication <- 0.5
 
 # Dropout rate from surveillance
-v2$rateOfDropoutFromMonitoring <- setType(1072/19650, "rate")
-v1distributions$rateOfDropoutFromMonitoring <- 
-  setType(list(shape=1072, scale=1/19650), "gamma pars for rate")
+#v2$rateOfDropoutFromMonitoring <- setType(1072/19650, "rate")
+#v1distributions$rateOfDropoutFromMonitoring <- 
+#  setType(list(shape=1072, scale=1/19650), "gamma pars for rate")
 
 # Incidental detection rate
-v2$rateOfIncidentalDetection <- setType(40/1364.25, "rate")
-v1distributions$rateOfIncidentalDetection <- 
-  setType(list(shape=40, scale=1/(321*4.25)), "gamma pars for rate")
+#v2$rateOfIncidentalDetection <- setType(40/1364.25, "rate")
+#v1distributions$rateOfIncidentalDetection <- 
+#  setType(list(shape=40, scale=1/(321*4.25)), "gamma pars for rate")
 
 # Delay from 5.5+cm scan to consultation
-v1other$waitingTimeToConsultation <- 10.6 / 365.25
+#v1other$waitingTimeToConsultation <- 10.6 / 365.25
 
 # Consultation scan
-v2$extraDiameterForCtScan <- setType(0.244, "fixed value") 
-v2$ctMeasurementErrorSD <- setType(0.19, "fixed value")  
-v1distributions$extraDiameterForCtScan <- 
-  setType(v2$extraDiameterForCtScan, "fixed value")
-v1distributions$ctMeasurementErrorSD <- 
-  setType(v2$ctMeasurementErrorSD, "fixed value")
+# v2$extraDiameterForCtScan <- setType(0.244, "fixed value") 
+# v2$ctMeasurementErrorSD <- setType(0.19, "fixed value")  
+#v1distributions$extraDiameterForCtScan <- 
+#  setType(v2$extraDiameterForCtScan, "fixed value")
+# v1distributions$ctMeasurementErrorSD <- 
+#  setType(v2$ctMeasurementErrorSD, "fixed value")
 
 # Decision at consultation: proportion returned to surveillance
 # No variables need to be defined here. 
 
 # Decision at consultation: non-intervention proportion
-v2$probOfContraindication <- setType(0.34226, "probability")
-v1distributions$probOfContraindication <- 
-  setType(list(mean=-0.65324, variance=(0.13502)^2), "hyperpars for logistic model for probability")
+#v2$probOfContraindication <- setType(0.34226, "probability")
+#v1distributions$probOfContraindication <- 
+#  setType(list(mean=-0.65324, variance=(0.13502)^2), "hyperpars for logistic model for probability")
 
 # Decision at consultation: proportion elective surgery
 # 1 minus probOfContraindication 
 
 # Delay from consultation to elective surgery
-v1other$waitingTimeToElectiveSurgery <- 70.8 / 365.25
+# v1other$waitingTimeToElectiveSurgery <- 70.8 / 365.25
 
 ################################################################################
 # ELECTIVE OPERATIONS
 
 # Proportion receiving EVAR vs. open repair
-v2$ probOfElectiveSurgeryIsOpen <- 
-  setType(c(intercept = -0.702391, age = -0.095305, aortaSize = 0.303022), 
-          "logistic model for probability")
-me <- c(intercept = -0.702391, age = -0.095305, aortaSize = 0.303022)
-names(me) <- c("intercept", "age", "aortaSize")
-co <- matrix(c(0.003111046, 0.0002046573, -0.0008173591, 0.0002046573, 0.00005598497, -0.000067048, -0.0008173591, -0.000067048, 0.0028017033), nrow=3)
-dimnames(co) <- list(names(me), names(me))
-v1distributions$probOfElectiveSurgeryIsOpen <- 
-              setType(list(mean=me, covariance=co), "hyperpars for logistic model for probability")
+#v2$ probOfElectiveSurgeryIsOpen <- 
+#  setType(c(intercept = -0.702391, age = -0.095305, aortaSize = 0.303022), 
+#          "logistic model for probability")
+#me <- c(intercept = -0.702391, age = -0.095305, aortaSize = 0.303022)
+#names(me) <- c("intercept", "age", "aortaSize")
+#co <- matrix(c(0.003111046, 0.0002046573, -0.0008173591, 0.0002046573, 0.00005598497, -0.000067048, -0.0008173591, -0.000067048, 0.0028017033), nrow=3)
+#dimnames(co) <- list(names(me), names(me))
+#v1distributions$probOfElectiveSurgeryIsOpen <- 
+#              setType(list(mean=me, covariance=co), "hyperpars for logistic model for probability")
 
 # Model for peri/post-operative mortality
-v1other$electiveSurgeryAaaDeathMethod <- "survivalModel"
+#v1other$electiveSurgeryAaaDeathMethod <- "survivalModel"
 
 # EVAR 30-day operative mortality
-v2$probOfAaaDeathInInitialPeriodAfterElectiveEvarSurgery <- 
-  setType(c(intercept = -3.909914, age = 0.002297, aortaSize = -0.027854,
-			logOddsAdjustment =log((37/(1642-37))/(27/(1642-27)))), 
-          "logistic model for probability")
+#v2$probOfAaaDeathInInitialPeriodAfterElectiveEvarSurgery <- 
+#  setType(c(intercept = -3.909914, age = 0.002297, aortaSize = -0.027854,
+#			logOddsAdjustment =log((37/(1642-37))/(27/(1642-27)))), 
+#          "logistic model for probability")
+
 # PSA
-me.evar.mort <- c(intercept = -3.909914, age = 0.002297, aortaSize = -0.027854)
-names(me.evar.mort) <- c("intercept", "age", "aortaSize")
-co.evar.mort <- matrix(c(0.0471354, 0.001398098, -0.008779374, 0.001398098, 0.000998351, -0.000983538, -0.008779374, -0.000983538, 0.0662445), nrow=3)
-dimnames(co.evar.mort) <- list(names(me.evar.mort), names(me.evar.mort))
-v1distributions$probOfAaaDeathInInitialPeriodAfterElectiveEvarSurgery <- 
-  setType(list(mean=me.evar.mort, covariance=co.evar.mort, logOddsAdjustment=log((37/(1642-37))/(27/(1642-27)))), 
-          "hyperpars for logistic model for probability")
+# me.evar.mort <- c(intercept = -3.909914, age = 0.002297, aortaSize = -0.027854)
+# names(me.evar.mort) <- c("intercept", "age", "aortaSize")
+# co.evar.mort <- matrix(c(0.0471354, 0.001398098, -0.008779374, 0.001398098, 0.000998351, -0.000983538, -0.008779374, -0.000983538, 0.0662445), nrow=3)
+# dimnames(co.evar.mort) <- list(names(me.evar.mort), names(me.evar.mort))
+# v1distributions$probOfAaaDeathInInitialPeriodAfterElectiveEvarSurgery <- 
+#   setType(list(mean=me.evar.mort, covariance=co.evar.mort, logOddsAdjustment=log((37/(1642-37))/(27/(1642-27)))), 
+#           "hyperpars for logistic model for probability")
 
 # Open repair 30-day operative mortality
-v2$probOfAaaDeathInInitialPeriodAfterElectiveOpenSurgery <- 
-  setType(c(intercept = -2.33601, age = 0.06416, aortaSize = 0.07745,
-        logOddsAdjustment=log((75/(1066-75))/(64/(1066-64)))), 
-          "logistic model for probability")
+  # v2$probOfAaaDeathInInitialPeriodAfterElectiveOpenSurgery <- 
+  #   setType(c(intercept = -2.33601, age = 0.06416, aortaSize = 0.07745,
+  #         logOddsAdjustment=log((75/(1066-75))/(64/(1066-64)))), 
+  #           "logistic model for probability")
 # PSA
-me.open.mort <- c(intercept = -2.33601, age = 0.06416, aortaSize = 0.07745)
-names(me.open.mort) <- c("intercept", "age", "aortaSize")
-co.open.mort <- matrix(c(0.02722675, 0.00172895, -0.00852093, 0.00172895, 0.000487737, -0.00047439, -0.00852093, -0.00047439, 0.016345717), nrow=3)
-dimnames(co.open.mort) <- list(names(me.open.mort), names(me.open.mort))
-v1distributions$probOfAaaDeathInInitialPeriodAfterElectiveOpenSurgery <- 
-  setType(list(mean=me.open.mort, covariance=co.open.mort, logOddsAdjustment=log((75/(1066-75))/(64/(1066-64)))), 
-          "hyperpars for logistic model for probability")
+# me.open.mort <- c(intercept = -2.33601, age = 0.06416, aortaSize = 0.07745)
+# names(me.open.mort) <- c("intercept", "age", "aortaSize")
+# co.open.mort <- matrix(c(0.02722675, 0.00172895, -0.00852093, 0.00172895, 0.000487737, -0.00047439, -0.00852093, -0.00047439, 0.016345717), nrow=3)
+# dimnames(co.open.mort) <- list(names(me.open.mort), names(me.open.mort))
+# v1distributions$probOfAaaDeathInInitialPeriodAfterElectiveOpenSurgery <- 
+#   setType(list(mean=me.open.mort, covariance=co.open.mort, logOddsAdjustment=log((75/(1066-75))/(64/(1066-64)))), 
+#           "hyperpars for logistic model for probability")
 
 # Re-intervention rate after successful EVAR
 v2$reinterventionRatesAfterElectiveEvar <- 

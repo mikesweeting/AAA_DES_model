@@ -63,17 +63,26 @@
 AAA_DES <- function(dataFile){
   ## Input Data for the DES model
   require(readxl)
-  DESData <- read_excel("input/DES_Data_Input.xlsx", sheet = 2, range="A7:M13", 
+  DESData <- read_excel(dataFile, sheet = 2, range="A7:Y26", 
                      col_names = T)
   DESData <- subset(DESData, !is.na(DESData$varname))
-  v0 <- compactList() 
-  v1distributions <- compactList() 
-  v1other <- compactList() 
-  v2 <- compactList() 
+  #v0 <- compactList() 
+  #v1distributions <- compactList() 
+  #v1other <- compactList() 
+  #v2 <- compactList() 
+  
+  ## For now always set this to "survivalModel"
+  v1other$electiveSurgeryAaaDeathMethod <- "survivalModel"
+  
   ## Assign main values
   for(i in 1:dim(DESData)[1]){
-    eval(parse(text=paste0(DESData$varname[i],"<- setType(", DESData$Value[i],
-                           ", type =", DESData$type[i], ")")))
+    if(!is.na(DESData$Value[i])){
+      eval(parse(text=paste0(DESData$varname[i],"<- setType(", DESData$Value[i],
+                             ", type =", DESData$type[i], ")")))
+    } else {
+      pars <- unlist(DESData[i,c("intercept","age","aortaSize")])
+      eval(parse(text=paste0(DESData$varname[i],"<- setType(pars, type =", DESData$type[i], ")")))
+    }
   }
   ## Assign PSA probability distributions
   for(i in 1:dim(DESData)[1]){
@@ -95,6 +104,41 @@ AAA_DES <- function(dataFile){
                              DESData$mean[i], ", variance=", DESData$sd[i]^2, 
                              "), type =", 
                              DESData$distribution.type[i], ")")))  
+    }
+    if(DESData$distribution.type[i]=="\"gamma pars for rate\""){
+      eval(parse(text=paste0(DESData$distribution.varname[i],
+                             "<- setType(list(shape=",
+                             DESData$shape[i], ", scale=", DESData$scale[i], 
+                             "), type =", 
+                             DESData$distribution.type[i], ")")))  
+    }
+    if(DESData$distribution.type[i]=="\"fixed value\""){
+      eval(parse(text=paste0(DESData$distribution.varname[i],
+                             "<- setType(",
+                             DESData$varname[i],
+                             ", type =", 
+                             DESData$distribution.type[i], ")")))  
+    }
+    if(DESData$distribution.type[i]=="\"hyperpars for logistic model for probability\""){
+      me <- unlist(DESData[i,c("mean intercept","mean age","mean aortaSize")])
+      names(me)<-c("intercept","age","aortaSize")
+      cov.vec <- unlist(DESData[i,c("variance intercept","covariance intercept/age","covariance intercept/aortaSize","variance age","covariance age/aortaSize","variance aortaSize")])
+      names(cov.vec) <- c("V11", "V12", "V13", "V22", "V23", "V33")
+      cov <- matrix(cov.vec[c(1:3,2,4:5,3,5:6)],nrow=3)
+      dimnames(cov) <- list(names(me), names(me))
+      if(sum(!is.na(me))==1){ ## only intercept specified
+        eval(parse(text=paste0(DESData$distribution.varname[i],
+                               "<- setType(list(mean=",
+                               me[1],
+                               ", variance=",
+                               cov[1,1],
+                               "), type =", 
+                               DESData$distribution.type[i], ")")))  
+      } else {
+        eval(parse(text=paste0(DESData$distribution.varname[i],
+                               "<- setType(list(mean= me, covariance= cov), type =", 
+                               DESData$distribution.type[i], ")")))  
+      }
     }
   }
 }
