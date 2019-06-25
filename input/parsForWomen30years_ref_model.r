@@ -2,23 +2,23 @@
 # Parameters for the women 30 year reference models
 ################################################################################
 
-v0 <- compactList() 
-v1distributions <- compactList() 
-v1other <- compactList() 
-v2 <- compactList() 
+v0 <- compactList()
+v1distributions <- compactList()
+v1other <- compactList()
+v2 <- compactList()
 
 ################################################################################
 # MISCELLANEOUS
 
-v1other$postSurgeryInitialPeriod <- 30 / 365.25
+#v1other$postSurgeryInitialPeriod <- 30 / 365.25
 
-v1other$startAge <- 65
+#v1other$startAge <- 65
 
-v0$generateCensoringTime <- function() { 30.000001 }  
+#v0$generateCensoringTime <- function() { 30.000001 }  
 
 # Post-surgery monitoring. 
-v1other$timeToMonitoringFollowingOpenSurgery <- (6 * 7)/ 365.25
-v1other$timeBetweenMonitoringFollowingEvarSurgery <- 1
+#v1other$timeToMonitoringFollowingOpenSurgery <- (6 * 7)/ 365.25
+#v1other$timeBetweenMonitoringFollowingEvarSurgery <- 1
 
 # No growth for women with a diameter of < 2cm 
 v1other$zeroGrowthDiameterThreshold <- 2.0 
@@ -49,23 +49,23 @@ names(v1other$baselineDiameters) <- c("size", "weight")
 #v1distributions$prevalence <- 
 #  setType(list(mean=-5.45054, variance=(0.32321)^2), "normal distribution for logit prevalence")
 
-v1other$prevalenceThreshold<-3.0
+#v1other$prevalenceThreshold<-3.0
 
 ################################################################################
 # AAA GROWTH & RUPTURE
 
-v2$beta0 <- 1.334426035
-v2$beta1 <- 0.05239619
-v2$sigma0 <- exp(-1.986425701)
-v2$sigma1 <- exp(-3.281826664)
-v2$rho <- tanh(0.409567743)
-v2$sigmaW <- exp(-2.960876192)
-v2$gamma <- -12.39926
-v2$alpha <- 5.468415
+#v2$beta0 <- 1.334426035
+#v2$beta1 <- 0.05239619
+#v2$sigma0 <- exp(-1.986425701)
+#v2$sigma1 <- exp(-3.281826664)
+#v2$rho <- tanh(0.409567743)
+#v2$sigmaW <- exp(-2.960876192)
+#v2$gamma <- -12.39926
+#v2$alpha <- 5.468415
 
-for (elementName in c("beta0", "beta1", "sigma0", "sigma1", "rho", "sigmaW",
-                      "gamma", "alpha"))
-  attr(v2[[elementName]], "type") <- "par for aorta model"
+#for (elementName in c("beta0", "beta1", "sigma0", "sigma1", "rho", "sigmaW",
+#                      "gamma", "alpha"))
+#  attr(v2[[elementName]], "type") <- "par for aorta model"
 
 # psa 
 growthParameterNames <- 
@@ -108,14 +108,15 @@ dimnames(v1distributions$covarianceForRuptureParameters) <-
 # SURVEILLANCE
 
 # Surveillance intervals
-v1other$aortaDiameterThresholds <- c(3.0, 4.5, 5.5)
-v1other$monitoringIntervals <- c(1, 1, 0.25) ## MS. updated so first interval relates to those normal (e.g. below first threshold)
-v1other$maxNumberMonitor <- c(Inf, Inf, Inf) ## maximum number of monitorings in each size group before discharge
-# Sub-AAA set-up
+## Here once in the screening programme, no discharge occurs (maxNumberMonitor == Inf for all sizes)
+#v1other$aortaDiameterThresholds <- c(3.0, 4.5, 5.5)
+#v1other$monitoringIntervals <- c(1, 1, 0.25) ## MS. updated so first interval relates to those normal (e.g. below first threshold)
+#v1other$maxNumberMonitor <- c(Inf, Inf, Inf) ## maximum number of monitorings in each size group before discharge from surveillance
+# Sub-AAA set-up whereby individuals who initially measure 2.5-3.0 come back for a scan 5 years later. Only 2 scans 2.5-3.0 are allowed before discharge
 #v1other$aortaDiameterThresholds <- c(2.5, 3.0, 4.5, 5.5)
 #v1other$monitoringIntervals <- c(Inf, 5, 1, 0.25) ## MS. updated so first interval relates to those normal (e.g. below first threshold)
 #v1other$maxNumberMonitor <- c(1, 2, Inf, Inf) ## maximum number of monitorings in each size group before discharge
-v1other$monitoringIntervalFollowingContraindication <- 0.5
+#v1other$monitoringIntervalFollowingContraindication <- 0.5
 
 # Dropout rate from surveillance
 #v2$rateOfDropoutFromMonitoring <- setType(1072/19650, "rate")
@@ -199,150 +200,152 @@ v1other$monitoringIntervalFollowingContraindication <- 0.5
 #           "hyperpars for logistic model for probability")
 
 # Re-intervention rate after successful EVAR
-v2$reinterventionRatesAfterElectiveEvar <- 
-  setType(c(20.3, 6.4) / 100, "reintervention rates")
-v1other$reinterventionTimeBoundariesAfterElectiveEvar <- 120 / 365.25
-v1distributions$reinterventionRatesAfterElectiveEvar <- 
-  setType(list(shapes=c(3, 27), scales=c(1/15, 1/421)), "gamma pars for multiple rates")
+#v2$reinterventionRatesAfterElectiveEvar <- 
+#  setType(c(20.3, 6.4) / 100, "reintervention rates")
+#v1other$reinterventionTimeBoundariesAfterElectiveEvar <- 120 / 365.25
+#v1distributions$reinterventionRatesAfterElectiveEvar <- 
+#  setType(list(shapes=c(3, 27), scales=c(1/15, 1/421)), "gamma pars for multiple rates")
 
 # Re-intervention rate after successful open repair
-v2$reinterventionRatesAfterElectiveOpen <- setType(0, "reintervention rates")
-v1other$reinterventionTimeBoundariesAfterElectiveOpen <- numeric()
-v1distributions$reinterventionRatesAfterElectiveOpen <- 
-  setType(v2$reinterventionRatesAfterElectiveOpen, "fixed value for reintervention rates")
+#v2$reinterventionRatesAfterElectiveOpen <- setType(0, "reintervention rates")
+#v1other$reinterventionTimeBoundariesAfterElectiveOpen <- numeric()
+#v1distributions$reinterventionRatesAfterElectiveOpen <- 
+#  setType(v2$reinterventionRatesAfterElectiveOpen, "fixed value for reintervention rates")
 
 # Long-term AAA mortality rate after successful EVAR
-v2$rateOfAaaDeathAfterElectiveEvarSurgeryAndInitialPeriod <- 
-  setType(1.799 / 100, "rate") 
-v1distributions$rateOfAaaDeathAfterElectiveEvarSurgeryAndInitialPeriod <- 
-  setType(list(shape=8, scale=1/444.7), "gamma pars for rate")
+#v2$rateOfAaaDeathAfterElectiveEvarSurgeryAndInitialPeriod <- 
+#  setType(1.799 / 100, "rate") 
+#v1distributions$rateOfAaaDeathAfterElectiveEvarSurgeryAndInitialPeriod <- 
+#  setType(list(shape=8, scale=1/444.7), "gamma pars for rate")
 
 # Long-term AAA mortality rate after successful open repair
-v2$rateOfAaaDeathAfterElectiveOpenSurgeryAndInitialPeriod <- 
-  setType(0.499 / 100, "rate") 
-v1distributions$rateOfAaaDeathAfterElectiveOpenSurgeryAndInitialPeriod <- 
-  setType(list(shape=2, scale=1/400.8), "gamma pars for rate")
+#v2$rateOfAaaDeathAfterElectiveOpenSurgeryAndInitialPeriod <- 
+#  setType(0.499 / 100, "rate") 
+#v1distributions$rateOfAaaDeathAfterElectiveOpenSurgeryAndInitialPeriod <- 
+#  setType(list(shape=2, scale=1/400.8), "gamma pars for rate")
 
 ################################################################################
 # EMERGENCY OPERATIONS
 
 # % operated after rupture
-v2$probOfEmergencySurgeryIfRupture <- setType(0.25, "probability")
-v1distributions$probOfEmergencySurgeryIfRupture <- 
-  setType(list(mean=0.25, variance=(0.05)^2), "truncated normal distribution")
+#v2$probOfEmergencySurgeryIfRupture <- setType(0.25, "probability")
+#v1distributions$probOfEmergencySurgeryIfRupture <- 
+#  setType(list(mean=0.25, variance=(0.05)^2), "truncated normal distribution")
 
 # Proportion receiving EVAR vs. open repair
-v2$probOfEmergencySurgeryIsOpen <- 
-  setType(c(intercept = 1.547574, age = -0.040946), 
-          "logistic model for probability")
+#v2$probOfEmergencySurgeryIsOpen <- 
+#  setType(c(intercept = 1.547574, age = -0.040946), 
+#          "logistic model for probability")
 # PSA
-me.emer <- c(intercept = 1.547574, age = -0.040946)
-names(me.emer) <- c("intercept", "age")
-co.emer <- matrix(c(0.009274124, 0.000107859, 0.000107859, 0.0001915343), nrow=2)
-dimnames(co.emer) <- list(names(me.emer), names(me.emer))
-v1distributions$probOfEmergencySurgeryIsOpen <-
-  setType(list(mean=me.emer, covariance=co.emer), "hyperpars for logistic model for probability")
+#me.emer <- c(intercept = 1.547574, age = -0.040946)
+#names(me.emer) <- c("intercept", "age")
+#co.emer <- matrix(c(0.009274124, 0.000107859, 0.000107859, 0.0001915343), nrow=2)
+#dimnames(co.emer) <- list(names(me.emer), names(me.emer))
+#v1distributions$probOfEmergencySurgeryIsOpen <-
+#  setType(list(mean=me.emer, covariance=co.emer), "hyperpars for logistic model for probability")
 
 # Model for peri/post-operative mortality
-v1other$emergencySurgeryAaaDeathMethod <- "survivalModel"
+#v1other$emergencySurgeryAaaDeathMethod <- "survivalModel"
 
 # EVAR 30-day operative mortality
-v2$probOfAaaDeathInInitialPeriodAfterEmergencyEvarSurgery <- 
-  setType(c(intercept = -1.14998, age = 0.06071,
-		logOddsAdjustment=log((48/(244-48))/(31/(244-31)))),  
-          "logistic model for probability")
+#v2$probOfAaaDeathInInitialPeriodAfterEmergencyEvarSurgery <- 
+#  setType(c(intercept = -1.14998, age = 0.06071,
+#		logOddsAdjustment=log((48/(244-48))/(31/(244-31)))),  
+#          "logistic model for probability")
 # PSA
-me.emer.evar <- c(intercept = -1.14998, age = 0.06071)
-names(me.emer.evar) <- c("intercept", "age")
-co.emer.ever <- matrix(c(0.04464549, -0.00136216, -0.00136216, 0.000737284), nrow=2)
-dimnames(co.emer.ever) <- list(names(me.emer.evar), names(me.emer.evar))
-v1distributions$probOfAaaDeathInInitialPeriodAfterEmergencyEvarSurgery <- 
-  setType(list(mean=me.emer.evar, covariance=co.emer.ever, logOddsAdjustment=log((48/(244-48))/(31/(244-31)))), 
-          "hyperpars for logistic model for probability")
+#me.emer.evar <- c(intercept = -1.14998, age = 0.06071)
+#names(me.emer.evar) <- c("intercept", "age")
+#co.emer.ever <- matrix(c(0.04464549, -0.00136216, -0.00136216, 0.000737284), nrow=2)
+#dimnames(co.emer.ever) <- list(names(me.emer.evar), names(me.emer.evar))
+#v1distributions$probOfAaaDeathInInitialPeriodAfterEmergencyEvarSurgery <- 
+#  setType(list(mean=me.emer.evar, covariance=co.emer.ever, logOddsAdjustment=log((48/(244-48))/(31/(244-31)))), 
+#          "hyperpars for logistic model for probability")
 
 # Open repair 30-day operative mortality
-v2$probOfAaaDeathInInitialPeriodAfterEmergencyOpenSurgery <- 
-  setType(c(intercept = -0.34268, age = 0.03293,
-		logOddsAdjustment=log((319/(845-319))/(284/(845-284)))),  
-          "logistic model for probability")
+#v2$probOfAaaDeathInInitialPeriodAfterEmergencyOpenSurgery <- 
+#  setType(c(intercept = -0.34268, age = 0.03293,
+#		logOddsAdjustment=log((319/(845-319))/(284/(845-284)))),  
+#          "logistic model for probability")
 # PSA
-me.emer.open <- c(intercept = -0.34268, age = 0.03293)
-names(me.emer.open) <- c("intercept", "age")
-co.emer.open <- matrix(c(0.006999579, 0.000271148, 0.000271148, 0.000138722), nrow=2)
-dimnames(co.emer.open) <- list(names(me.emer.open), names(me.emer.open))
-v1distributions$probOfAaaDeathInInitialPeriodAfterEmergencyOpenSurgery <- 
-  setType(list(mean=me.emer.open, covariance=co.emer.open, logOddsAdjustment=log((319/(845-319))/(284/(845-284)))), 
-          "hyperpars for logistic model for probability")
+#me.emer.open <- c(intercept = -0.34268, age = 0.03293)
+#names(me.emer.open) <- c("intercept", "age")
+#co.emer.open <- matrix(c(0.006999579, 0.000271148, 0.000271148, 0.000138722), nrow=2)
+#dimnames(co.emer.open) <- list(names(me.emer.open), names(me.emer.open))
+#v1distributions$probOfAaaDeathInInitialPeriodAfterEmergencyOpenSurgery <- 
+#  setType(list(mean=me.emer.open, covariance=co.emer.open, logOddsAdjustment=log((319/(845-319))/(284/(845-284)))), 
+#          "hyperpars for logistic model for probability")
 
 # Re-intervention rate after successful EVAR
-v2$reinterventionRatesAfterEmergencyEvar <- 
-  setType(15.8 / 100, "reintervention rates")
-v1other$reinterventionTimeBoundariesAfterEmergencyEvar <- numeric()
-v1distributions$reinterventionRatesAfterEmergencyEvar <- 
-  setType(list(shape=9, scale=1/57), "gamma pars for rate")
+#v2$reinterventionRatesAfterEmergencyEvar <- 
+#  setType(15.8 / 100, "reintervention rates")
+#v1other$reinterventionTimeBoundariesAfterEmergencyEvar <- numeric()
+#v1distributions$reinterventionRatesAfterEmergencyEvar <- 
+#  setType(list(shape=9, scale=1/57), "gamma pars for rate")
 
 # Re-intervention rate after successful open repair
-v2$reinterventionRatesAfterEmergencyOpen <- setType(2.3 / 100, "reintervention rates")
-v1other$reinterventionTimeBoundariesAfterEmergencyOpen <- numeric()
-v1distributions$reinterventionRatesAfterEmergencyOpen <- 
-  setType(list(shape=2, scale=1/85), "gamma pars for rate")
+#v2$reinterventionRatesAfterEmergencyOpen <- setType(2.3 / 100, "reintervention rates")
+#v1other$reinterventionTimeBoundariesAfterEmergencyOpen <- numeric()
+#v1distributions$reinterventionRatesAfterEmergencyOpen <- 
+#  setType(list(shape=2, scale=1/85), "gamma pars for rate")
 
 # Long-term AAA mortality rate after successful EVAR
-v2$rateOfAaaDeathAfterEmergencyEvarSurgeryAndInitialPeriod <- 
-  setType(1e-100, "rate")  # the document says zero; search for myRexp
-v1distributions$rateOfAaaDeathAfterEmergencyEvarSurgeryAndInitialPeriod <- 
-  setType(v2$rateOfAaaDeathAfterEmergencyEvarSurgeryAndInitialPeriod, "fixed value for rate")
+#v2$rateOfAaaDeathAfterEmergencyEvarSurgeryAndInitialPeriod <- 
+#  setType(1e-100, "rate")  # the document says zero; search for myRexp
+#v1distributions$rateOfAaaDeathAfterEmergencyEvarSurgeryAndInitialPeriod <- 
+#  setType(v2$rateOfAaaDeathAfterEmergencyEvarSurgeryAndInitialPeriod, "fixed value for rate")
 
 # Long-term AAA mortality rate after successful open repair
-v2$rateOfAaaDeathAfterEmergencyOpenSurgeryAndInitialPeriod <- 
-  setType(1.613 / 100, "rate")
-v1distributions$rateOfAaaDeathAfterEmergencyOpenSurgeryAndInitialPeriod <- 
-  setType(list(shape=2, scale=1/124), "gamma pars for rate")
+#v2$rateOfAaaDeathAfterEmergencyOpenSurgeryAndInitialPeriod <- 
+#  setType(1.613 / 100, "rate")
+#v1distributions$rateOfAaaDeathAfterEmergencyOpenSurgeryAndInitialPeriod <- 
+#  setType(list(shape=2, scale=1/124), "gamma pars for rate")
 
 ################################################################################
 # COSTS
 
-v2$costs <- setType(c(
-  inviteToScreen=1.80, 
-  requireReinvitation=1.80, 
-  screen=34.11, 
-  monitor=72.03,
-  monitorFollowingContraindication=72.03,   
-  consultation=328.64,
-  electiveSurgeryEvar=13844,  
-  electiveSurgeryOpen=13060,
-  emergencySurgeryEvar=16154,
-  emergencySurgeryOpen=17613,
-  reinterventionAfterElectiveEvar=7546,
-  reinterventionAfterElectiveOpen=8986,
-  reinterventionAfterEmergencyEvar=7546,
-  reinterventionAfterEmergencyOpen=8986,
-  monitorFollowingEvarSurgery=258.16,
-  monitorFollowingOpenSurgery=196.79
-), type="costs")
-
-v1distributions$costs <- 
-  setType(list(mean=log(v2$costs), variance=(0.114)^2), "distribution for costs")
+# v2$costs <- setType(c(
+#   inviteToScreen=1.80,
+#   requireReinvitation=1.80,
+#   screen=34.11,
+#   monitor=72.03,
+#   monitorFollowingContraindication=72.03,
+#   consultation=328.64,
+#   electiveSurgeryEvar=13844,
+#   electiveSurgeryOpen=13060,
+#   emergencySurgeryEvar=16154,
+#   emergencySurgeryOpen=17613,
+#   reinterventionAfterElectiveEvar=7546,
+#   reinterventionAfterElectiveOpen=8986,
+#   reinterventionAfterEmergencyEvar=7546,
+#   reinterventionAfterEmergencyOpen=8986,
+#   monitorFollowingEvarSurgery=258.16,
+#   monitorFollowingOpenSurgery=196.79
+# ), type="costs")
+# 
+# v1distributions$costs <- 
+#  setType(list(mean=log(v2$costs), variance=rep((0.114)^2,length(v2$costs))), "distribution for costs")
 
 
 ################################################################################
 # MISCELLANEOUS
 
 # Non-AAA mortality rate
-v1other$nonAaaDeathMethod <- "onsIntegerStart"
-v1other$nonAaaMortalityRatesFileName <- 
-  "input/nonAaaDeathMortalityRatesForWomen.csv" 
+#v1other$nonAaaDeathMethod <- "onsIntegerStart"
+#v1other$nonAaaMortalityRatesFileName <- 
+#  "input/nonAaaDeathMortalityRatesForWomen.csv" 
 
 # Overall QoL / utilities
-v1other <- compactList(append(v1other, createQalyFactors(
-  startAge=v1other$startAge,
-  qalyFactorBoundariesAsAges=c(25, 35, 45, 55, 65, 75), 
-  qalyFactorsForAges=c(Inf, Inf, Inf, Inf, 0.81, 0.78, 0.71)
-)))
+# v1other <- compactList(append(v1other, createQalyFactors(
+#   startAge=v1other$startAge,
+#   #qalyFactorBoundariesAsAges=c(25, 35, 45, 55, 65, 75), 
+#   #qalyFactorsForAges=c(Inf, Inf, Inf, Inf, 0.81, 0.78, 0.71)
+#   qalyFactorBoundariesAsAges=c(65, 75), 
+#   qalyFactorsForAges=c(0.81, 0.78, 0.71)
+# )))
 
 # Discount rates
-v1other$lifeYearDiscountRate <- 3.5 / 100
-v1other$costDiscountRate <- 3.5 / 100
+#v1other$lifeYearDiscountRate <- 3.5 / 100
+#v1other$costDiscountRate <- 3.5 / 100
 
 ################################################################################
 
