@@ -21,7 +21,7 @@ v2 <- compactList()
 #v1other$timeBetweenMonitoringFollowingEvarSurgery <- 1
 
 # No growth for women with a diameter of < 2cm 
-v1other$zeroGrowthDiameterThreshold <- 2.0 
+#v1other$zeroGrowthDiameterThreshold <- 2.0 
 
 ################################################################################
 # SCREENING
@@ -42,9 +42,9 @@ v1other$zeroGrowthDiameterThreshold <- 2.0
 #                                        "fixed value for probability")
 
 # Prevalence proportion
-fileName <- "input/AAA max measurements.csv"
-v1other$baselineDiameters <- read.csv(fileName, comment.char="#")[, c("size", "pw")]
-names(v1other$baselineDiameters) <- c("size", "weight")
+#fileName <- "input/AAA max measurements.csv"
+#v1other$baselineDiameters <- read.csv(fileName, comment.char="#")[, c("size", "pw")]
+#names(v1other$baselineDiameters) <- c("size", "weight")
 #v2$prevalence <- setType(0.0042756, "probability")
 #v1distributions$prevalence <- 
 #  setType(list(mean=-5.45054, variance=(0.32321)^2), "normal distribution for logit prevalence")

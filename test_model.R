@@ -39,7 +39,7 @@ result$meanQuantities
 # N = 4000
 # quantity
 # treatmentGroup lifeYears    qalys      cost discountedLifeYears discountedQalys discountedCost
-# noScreening  20.29572 15.07328  80.07796            13.80255        10.35351       41.54997
+# noScreening  20.29571 15.07328  80.07796            13.80255        10.35351       41.54997
 # screening    20.30187 15.07777 112.05991            13.80629        10.35625       75.19093
 
 ## N = 1000

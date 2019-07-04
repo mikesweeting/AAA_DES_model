@@ -75,14 +75,24 @@ AAA_DES <- function(dataFile, psa = FALSE){
   DESData <- subset(DESData, !is.na(DESData$varname))
 	
   ## Growth and rupture rate data
-  growthData <- read_excel(dataFile, sheet = "Growth and Rupture Rates", range="A21:D200", 
+  growthData <- read_excel(dataFile, sheet = "Growth and Rupture Rates", range="A19:D200", 
                      col_names = T)
   growthData <- subset(growthData, !is.na(growthData$varname))
 
-
-  ## Other cause mortality
+  ## AAA Size Distribution
+  v1other$baselineDiameters <- read_excel(dataFile, sheet = "AAA Size Distribution",  
+                                col_names = T, skip = 4)
+  names(v1other$baselineDiameters) <- c("size", "weight")
+  v1other$baselineDiameters <- subset(v1other$baselineDiameters, !is.na(v1other$baselineDiameters$size))
+  
+  ## Model parameters
+  modelParameters <- read_excel(dataFile, sheet = "Model Parameters", range="A6:D200", 
+                               col_names = T)
+  modelParameters <- subset(modelParameters, !is.na(modelParameters$varname))
+  
+    ## Other cause mortality
   nonAAA <- read_excel(dataFile, sheet = "Other cause mortality", 
-                        col_names = T)
+                        col_names = T, skip = 4)
   nonAAA <- column_to_rownames(nonAAA, var = "Age")
   v1other$nonAaaMortalityRatesFileName <- nonAAA ## allow dataset to be given instead of a csv file name. Change readMortalityRatesFromFile 
 
@@ -160,7 +170,22 @@ AAA_DES <- function(dataFile, psa = FALSE){
     }
   }
 
-
+  ## Assign model parameters
+  for(i in 1:dim(modelParameters)[1]){
+    if(!is.na(modelParameters$Value[i])){
+      if(!is.na(modelParameters$type[i])){
+        if(modelParameters$type[i] == "\"function\""){
+          eval(parse(text=paste0(modelParameters$varname[i],"<- function() {", modelParameters$Value[i], "}")))
+        } else {
+          eval(parse(text=paste0(modelParameters$varname[i],"<- setType(", modelParameters$Value[i],
+                                 ", type =", modelParameters$type[i], ")")))
+        }
+      } else {
+        eval(parse(text=paste0(modelParameters$varname[i],"<- ", modelParameters$Value[i])))
+      }
+    }
+  }
+  
   ## Assign last monitoring interval input to v1other$monitoringIntervalFollowingContraindication and remove it from v1other$monitoringIntervals
   v1other$monitoringIntervalFollowingContraindication <- v1other$monitoringIntervals[length(v1other$monitoringIntervals)]
   v1other$monitoringIntervals <- v1other$monitoringIntervals[-length(v1other$monitoringIntervals)]
