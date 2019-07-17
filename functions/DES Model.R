@@ -38,6 +38,13 @@
 # CONTENTS
 ################################################################################
 # 0) AAA_DES - Wrapper function that runs processPersons, reading in all data from Excel Data Input Spreadsheet
+## ARGUMENTS:
+## dataFile -- Excel data file to be passed to AAA_DES
+## psa -- Should PSA be conducted (defaults to FALSE)
+## n -- Number of pairs of individuals to be run in DES (defaults to 10000)
+## nPSA -- Number of PSA iterations (defaults to 100). Only used if psa = TRUE
+## extraInputs -- A list of any elements of v0, v1other, v1distributions and v2 that the user wishes to change from the R command line
+
 
 # 1a) processPersons 
 # 1b) processPersonsAboveDiagnosisThreshold
@@ -60,7 +67,7 @@
 
 ################################################################################
 # AAA_DES
-AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100){
+AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, extraInputs = list()){
   v0 <- compactList() 
   v1distributions <- compactList() 
   v1other <- compactList()
@@ -314,9 +321,31 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100){
     v1distributions$costs <- setType(list(mean = unlist(mean.d.costs), variance = unlist(variance.d.costs)), 
                                      type = "distribution for costs")
   }
- #browser()
+ 
+  ## Replace any inputs with user-defined inputs from AAA_DES
+  if(length(extraInputs) > 0){
+    inputNames <- names(extraInputs)
+    for(k in 1:length(inputNames)){
+      if(inputNames[k] %in% names(v0)){
+        att <- attr(v0[[inputNames[k]]], "type")
+        v0[inputNames[k]] <- extraInputs[k]
+        attr(v0[[inputNames[k]]], "type") <- att
+      } else if(inputNames[k] %in% names(v1other)){
+        att <- attr(v1other[[inputNames[k]]], "type")
+        v1other[inputNames[k]] <- extraInputs[k]
+        attr(v1other[[inputNames[k]]], "type") <- att
+      } else if(inputNames[k] %in% names(v1distributions)){
+        att <- attr(v1distributions[[inputNames[k]]], "type")
+        v1distributions[inputNames[k]] <- extraInputs[k]
+        attr(v1distributions[[inputNames[k]]], "type") <- att
+      } else if(inputNames[k] %in% names(v2)){
+        att <- attr(v2[[inputNames[k]]], "type")
+        v2[inputNames[k]] <- extraInputs[k]
+        attr(v2[[inputNames[k]]], "type") <- att
+      }
+    }
+  }
   
-  ## Following to be updated.....
   if(psa == FALSE) {
     ## Run model once using point estimates
     result <- processPersons(v0, v1other, v2)
