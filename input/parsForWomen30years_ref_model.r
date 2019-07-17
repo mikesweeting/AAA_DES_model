@@ -2,10 +2,10 @@
 # Parameters for the women 30 year reference models
 ################################################################################
 
-v0 <- compactList()
-v1distributions <- compactList()
-v1other <- compactList()
-v2 <- compactList()
+# v0 <- compactList()
+# v1distributions <- compactList()
+# v1other <- compactList()
+# v2 <- compactList()
 
 ################################################################################
 # MISCELLANEOUS
@@ -68,40 +68,40 @@ v2 <- compactList()
 #  attr(v2[[elementName]], "type") <- "par for aorta model"
 
 # psa 
-growthParameterNames <- 
-  c("beta1", "beta0", "logSigma1", "logSigma0", "atanhRho", "logSigmaW")
-ruptureParameterNames <- c("alpha", "gamma")
+#growthParameterNames <- 
+#  c("beta1", "beta0", "logSigma1", "logSigma0", "atanhRho", "logSigmaW")
+#ruptureParameterNames <- c("alpha", "gamma")
 
 # Hexavariate normal distribution
-v1distributions$meanForGrowthParameters <- setType(
-   c(0.05239619, 1.334426035, -3.281826664, -1.986425701, 0.409567743, -2.960876192),
-   "hyperpars for aorta model")
+#v1distributions$meanForGrowthParameters <- setType(
+#   c(0.05239619, 1.334426035, -3.281826664, -1.986425701, 0.409567743, -2.960876192),
+#   "hyperpars for aorta model")
 
-v1distributions$covarianceForGrowthParameters <- setType(
-  matrix(nrow=6, data=c(
-    0.000014724, 0.000006551, 0.000028327, 0.000186028, -0.000124773, -0.000087445,
-    0.000006551, 0.000567509, -0.000751974, -0.001363946, -0.000417865, -0.001799988,
-    0.000028327, -0.000751974, 0.009516028, 0.005153026, -0.0000471, 0.00240076,
-    0.000186028, -0.001363946, 0.005153026, 0.011569443, 0.000842861, 0.005566187,
-    -0.000124773, -0.000417865, -0.0000471, 0.000842861, 0.011419265, 0.005260149,
-    -0.000087445, -0.001799988, 0.00240076, 0.005566187, 0.005260149, 0.013688456)),
-    "hyperpars for aorta model")
+# v1distributions$covarianceForGrowthParameters <- setType(
+#   matrix(nrow=6, data=c(
+#     0.000014724, 0.000006551, 0.000028327, 0.000186028, -0.000124773, -0.000087445,
+#     0.000006551, 0.000567509, -0.000751974, -0.001363946, -0.000417865, -0.001799988,
+#     0.000028327, -0.000751974, 0.009516028, 0.005153026, -0.0000471, 0.00240076,
+#     0.000186028, -0.001363946, 0.005153026, 0.011569443, 0.000842861, 0.005566187,
+#     -0.000124773, -0.000417865, -0.0000471, 0.000842861, 0.011419265, 0.005260149,
+#     -0.000087445, -0.001799988, 0.00240076, 0.005566187, 0.005260149, 0.013688456)),
+#     "hyperpars for aorta model")
 
 # Bivariate normal distribution
-v1distributions$meanForRuptureParameters <- 
-  setType(c(5.468415, -12.39926), "hyperpars for aorta model")
-v1distributions$covarianceForRuptureParameters <- setType(
-  matrix(nrow=2, data=c(
-    1.589157, -2.217831,
-    -2.217831, 3.140564)),
-  "hyperpars for aorta model")
+# v1distributions$meanForRuptureParameters <- 
+#   setType(c(5.468415, -12.39926), "hyperpars for aorta model")
+# v1distributions$covarianceForRuptureParameters <- setType(
+#   matrix(nrow=2, data=c(
+#     1.589157, -2.217831,
+#     -2.217831, 3.140564)),
+#   "hyperpars for aorta model")
 
-names(v1distributions$meanForGrowthParameters) <- growthParameterNames
-dimnames(v1distributions$covarianceForGrowthParameters) <- 
-  list(growthParameterNames, growthParameterNames)
-names(v1distributions$meanForRuptureParameters) <- ruptureParameterNames
-dimnames(v1distributions$covarianceForRuptureParameters) <- 
-  list(ruptureParameterNames, ruptureParameterNames)
+#names(v1distributions$meanForGrowthParameters) <- growthParameterNames
+# dimnames(v1distributions$covarianceForGrowthParameters) <- 
+#   list(growthParameterNames, growthParameterNames)
+# names(v1distributions$meanForRuptureParameters) <- ruptureParameterNames
+# dimnames(v1distributions$covarianceForRuptureParameters) <- 
+#   list(ruptureParameterNames, ruptureParameterNames)
 
 
 ################################################################################

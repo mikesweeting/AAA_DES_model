@@ -60,23 +60,28 @@
 
 ################################################################################
 # AAA_DES
-AAA_DES <- function(dataFile, psa = FALSE){
-  # v0 <- compactList() 
-  # v1distributions <- compactList() 
-  # v1other <- compactList() 
-  # v2 <- compactList() 
+AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100){
+  v0 <- compactList() 
+  v1distributions <- compactList() 
+  v1other <- compactList()
+  v2 <- compactList()
+
+  ## Number of persons and number of PSA iterations
+  v0$numberOfPersons <- n
+  v0$numberOfParameterIterations <- nPSA
   
   ## Input Data for the DES model
   require(readxl)
   require(tibble)
+  
   ## Main Data Items
   DESData <- read_excel(dataFile, sheet = "Main Data Items", range="A7:AA200", 
                      col_names = T)
   DESData <- subset(DESData, !is.na(DESData$varname))
 	
   ## Growth and rupture rate data
-  growthData <- read_excel(dataFile, sheet = "Growth and Rupture Rates", range="A19:D200", 
-                     col_names = T)
+  growthData <- suppressMessages(read_excel(dataFile, sheet = "Growth and Rupture Rates", range="A19:I200", 
+                     col_names = T))
   growthData <- subset(growthData, !is.na(growthData$varname))
 
   ## AAA Size Distribution
@@ -160,15 +165,44 @@ AAA_DES <- function(dataFile, psa = FALSE){
   for(i in 1:dim(growthData)[1]){
     if(!is.na(growthData$Value[i])){
       if(!is.na(growthData$type[i])){
-        if(growthData$type[i] == "\"function\""){
-          eval(parse(text=paste0(growthData$varname[i],"<- function() {", growthData$Value[i], "}")))
+        if(growthData$type[i] != "\"hyperpars for aorta model\""){
+          eval(parse(text=paste0(growthData$varname[i],"<- setType(", growthData$Value[i],
+                                 ", type =", growthData$type[i], ")")))
         } else {
-        eval(parse(text=paste0(growthData$varname[i],"<- setType(", growthData$Value[i],
-                               ", type =", growthData$type[i], ")")))
+          if(growthData$varname[i] == "v1distributions$covarianceForGrowthParameters"){
+            eval(parse(text=paste0(growthData$varname[i],"<- setType( matrix( nrow = 6, data = c(", 
+                                   paste(unlist(growthData[i:(i+5),4:9]), collapse=", "),
+                                   ")), type =", growthData$type[i], ")")))
+            s <- v1distributions$covarianceForGrowthParameters
+            s[lower.tri(s)] <- t(s)[lower.tri(s)]
+            v1distributions$covarianceForGrowthParameters <- s
+          } else if(growthData$varname[i] == "v1distributions$covarianceForRuptureParameters"){
+            eval(parse(text=paste0(growthData$varname[i],"<- setType( matrix( nrow = 2, data = c(", 
+                                   paste(unlist(growthData[i:(i+1),4:5]), collapse=", "),
+                                   ")), type =", growthData$type[i], ")")))
+            s <- v1distributions$covarianceForRuptureParameters
+            s[lower.tri(s)] <- t(s)[lower.tri(s)]
+            v1distributions$covarianceForRuptureParameters <- s
+          }
+          
         }
       }
     }
   }
+  growthParameterNames <- 
+    c("beta1", "beta0", "logSigma1", "logSigma0", "atanhRho", "logSigmaW")
+  ruptureParameterNames <- c("alpha", "gamma")
+  v1distributions$meanForGrowthParameters <- setType(
+    c(v2$beta1, v2$beta0, log(v2$sigma1), log(v2$sigma0), atanh(v2$rho), log(v2$sigmaW)),
+    "hyperpars for aorta model")
+  names(v1distributions$meanForGrowthParameters) <- growthParameterNames
+  v1distributions$meanForRuptureParameters <- 
+     setType(c(v2$alpha, v2$gamma), "hyperpars for aorta model")
+  dimnames(v1distributions$covarianceForGrowthParameters) <-
+    list(growthParameterNames, growthParameterNames)
+  names(v1distributions$meanForRuptureParameters) <- ruptureParameterNames
+  dimnames(v1distributions$covarianceForRuptureParameters) <-
+    list(ruptureParameterNames, ruptureParameterNames)
 
   ## Assign model parameters
   for(i in 1:dim(modelParameters)[1]){
@@ -2904,7 +2938,7 @@ checkV1distributions <- function(v1distributions) {
 	
 	# Check the elements of v1distributions. 
 	for (v1elementName in names(v1distributions)) {
-		# Get v1element and type, check v1element is not NA.
+	  # Get v1element and type, check v1element is not NA.
 		v1element <- v1distributions[[v1elementName]]
 		if (any(is.na(v1element))) {
 			cat("\nv1distributions$", v1elementName, ":\n", sep="")

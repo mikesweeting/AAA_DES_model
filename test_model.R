@@ -7,7 +7,7 @@ source("functions/DES Model.R")
 source("functions/shiny_output_functions.R")
 
 # Parameters.
-source("input/parsForWomen30years_ref_model.R") 
+#source("input/parsForWomen30years_ref_model.R") 
 
 # Settings.
 # v0$numberOfPersons <- 1e3
@@ -33,8 +33,8 @@ dataFile <- "input/DES_Data_Input.xlsx"
 
 
 #result <- processPersons(v0, v1other, v2)
-v0$numberOfPersons <- 4000
-result <- AAA_DES(dataFile)
+# v0$numberOfPersons <- 4000
+result <- AAA_DES(dataFile, n = 4000)
 result$meanQuantities
 # N = 4000
 # quantity
@@ -43,8 +43,8 @@ result$meanQuantities
 # screening    20.30187 15.07777 112.05991            13.80629        10.35625       75.19093
 
 ## N = 1000
-v0$numberOfPersons <- 1000
-result <- AAA_DES(dataFile)
+# v0$numberOfPersons <- 1000
+result <- AAA_DES(dataFile, n = 1000)
 result$meanQuantities
 # quantity
 # treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys
@@ -56,8 +56,8 @@ result$meanQuantities
 # screening         31.37802
 
 ## N=10,000
-v0$numberOfPersons <- 10000
-result <- AAA_DES(dataFile)
+# v0$numberOfPersons <- 10000
+result <- AAA_DES(dataFile, n = 10000)
 result$meanQuantities
 ## 
 # quantity
@@ -72,9 +72,7 @@ result$eventHistories[which(lapply(1:length(result$eventHistories),singleEvent,r
 
 
 ## Checking PSA
-v0$numberOfPersons <- 1000
-v0$numberOfParameterIterations <- 5
-psaResult <- AAA_DES(dataFile, psa = TRUE)
+psaResult <- AAA_DES(dataFile, psa = TRUE, n = 1000, nPSA = 5)
 psaResult$psaQuantities
 # , , psaIterationNumber = 1
 # 
