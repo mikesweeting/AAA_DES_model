@@ -29,7 +29,7 @@ targetGroup <- data.frame(sex="Male", age=65, smoker=1)
 ## baselineDiameters -- list(targeted, notTargeted), each w
 ## targeted - If true then baselineDiameters and all parameters are a list with two elements (targeted and notTargeted)
 
-dataFile <- "input/DES_Data_Input.xlsx"
+dataFile <- "input/DES_Data_Input_Women30years_ref.xlsx"
 
 
 #result <- processPersons(v0, v1other, v2)

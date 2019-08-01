@@ -67,7 +67,8 @@
 
 ################################################################################
 # AAA_DES
-AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, extraInputs = list()){
+AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, 
+                    extraInputs = list(v0 = list(), v1other = list(), v2 = list(), v1distributions = list())){
   v0 <- compactList() 
   v1distributions <- compactList() 
   v1other <- compactList()
@@ -120,7 +121,7 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, extraInputs = 
   v1other$nonAaaDeathMethod <- "onsIntegerStart"
   ## For now always set period where re-interventions are not counted (part of initial operation period) to 30 days
   v1other$postSurgeryInitialPeriod <- 30 / 365.25
-  
+ 
   ## Assign main values
   for(i in 1:dim(DESData)[1]){
     if(!is.na(DESData$Value[i])){
@@ -134,12 +135,16 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, extraInputs = 
       } else {
         eval(parse(text=paste0(DESData$varname[i],"<- ", DESData$Value[i])))
       }
-    } else {
+    } else if(!is.na(DESData[i, "intercept"])) {
       pars <- unlist(DESData[i,c("intercept","age","aortaSize")])
       pars <- pars[!is.na(pars)]
       eval(parse(text=paste0(DESData$varname[i],"<- setType(pars, type =", DESData$type[i], ")")))
+    } else {
+      eval(parse(text=paste0(DESData$varname[i],"<- ", DESData$Value[i])))
     }
   }
+ 
+
   ## Assign list of costs
   v2$costs <- setType(c(
     inviteToScreen=costs.inviteToScreen, 
@@ -321,31 +326,39 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, extraInputs = 
     v1distributions$costs <- setType(list(mean = unlist(mean.d.costs), variance = unlist(variance.d.costs)), 
                                      type = "distribution for costs")
   }
- 
+  
+  ## If prevalence is NA then set to NULL
+  if(is.na(v2$prevalence)){
+    v2$prevalence <- NULL
+  }
+  
+
   ## Replace any inputs with user-defined inputs from AAA_DES
-  if(length(extraInputs) > 0){
-    inputNames <- names(extraInputs)
-    for(k in 1:length(inputNames)){
-      if(inputNames[k] %in% names(v0)){
-        att <- attr(v0[[inputNames[k]]], "type")
-        v0[inputNames[k]] <- extraInputs[k]
-        attr(v0[[inputNames[k]]], "type") <- att
-      } else if(inputNames[k] %in% names(v1other)){
-        att <- attr(v1other[[inputNames[k]]], "type")
-        v1other[inputNames[k]] <- extraInputs[k]
-        attr(v1other[[inputNames[k]]], "type") <- att
-      } else if(inputNames[k] %in% names(v1distributions)){
-        att <- attr(v1distributions[[inputNames[k]]], "type")
-        v1distributions[inputNames[k]] <- extraInputs[k]
-        attr(v1distributions[[inputNames[k]]], "type") <- att
-      } else if(inputNames[k] %in% names(v2)){
-        att <- attr(v2[[inputNames[k]]], "type")
-        v2[inputNames[k]] <- extraInputs[k]
-        attr(v2[[inputNames[k]]], "type") <- att
+  for(l in 1:length(extraInputs)){
+    if(length(extraInputs[[l]]) > 0){
+      inputNames <- names(extraInputs[[l]])
+      for(k in 1:length(inputNames)){
+        if(names(extraInputs[l]) == "v0"){
+          att <- attr(extraInputs[[l]][[k]], "type")
+          v0[inputNames[k]] <- extraInputs[[l]][k]
+          attr(v0[[inputNames[k]]], "type") <- att
+        } else if(names(extraInputs[l]) == "v1other"){
+          att <- attr(extraInputs[[l]][[k]], "type")
+          v1other[inputNames[k]] <- extraInputs[[l]][k]
+          attr(v1other[[inputNames[k]]], "type") <- att
+        } else if(names(extraInputs[l]) == "v1distributions"){
+          att <- attr(extraInputs[[l]][[k]], "type")
+          v1distributions[inputNames[k]] <- extraInputs[[l]][k]
+          attr(v1distributions[[inputNames[k]]], "type") <- att
+        } else if(names(extraInputs[l]) == "v2"){
+          att <- attr(extraInputs[[l]][[k]], "type")
+          v2[inputNames[k]] <- extraInputs[[l]][k]
+          attr(v2[[inputNames[k]]], "type") <- att
+        }
       }
     }
   }
-  
+
   if(psa == FALSE) {
     ## Run model once using point estimates
     result <- processPersons(v0, v1other, v2)
@@ -961,7 +974,7 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 	numberMonitor <- rep(0,length(v1other$aortaDiameterThresholds)+1)
 	
 	repeat {
-		# Make sure that all the scheduled times are different (exclude NAs).
+		# Make sure that all the scheduled times are different (exclude NAs and Infinities -- MS added 24/07/2019).
 		if (!allDifferent(scheduledEvents)) {
 			print(scheduledEvents)
 			stop("scheduledEvents times must all be different")
@@ -1039,7 +1052,6 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 					v1other$aortaDiameterThresholds)
 			## Add one to the times patient has been screened or monitored in this size group
 			numberMonitor[aortaSizeGroup + 1] <- numberMonitor[aortaSizeGroup + 1] + 1
-
 			## If numberMonitor <= maxNumberMonitor then schedule another monitor else discharge from surveillance
 			## Last group has Inf number of monitors. This corresponds with large AAA group
 			if (numberMonitor[aortaSizeGroup + 1] < c(v1other$maxNumberMonitor, Inf)[aortaSizeGroup + 1]){
@@ -2441,6 +2453,7 @@ rbernoulli <- function(pr) {
 allDifferent <- function(x) {
 	if (!is.vector(x)) stop("x must be a vector")
 	x <- na.omit(x)
+	x <- x[is.finite(x)] ## added by MS on 24/07/19 so infinite surveillance intervals can be added if required
 	length(x) == length(unique(x))
 }
 
@@ -2914,7 +2927,7 @@ checkV1other <- function(v1other) {
 	# Check v1other$aortaDiameterThresholds and v1other$monitoringIntervals.
 	if (length(v1other$aortaDiameterThresholds) != 
 			length(v1other$monitoringIntervals)) ## updated MS 07/02/19
-		stop("v1other$aortaDiameterThresholds must be exactly the same length as ",
+		stop("v1other$aortaDiameterThresholds must be of length one less than ",
 				"v1other$monitoringIntervals")
 	if (!identical(v1other$aortaDiameterThresholds, 
 			sort(v1other$aortaDiameterThresholds)))

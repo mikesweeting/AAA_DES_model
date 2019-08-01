@@ -63,8 +63,8 @@ for (elementName in c("beta0", "beta1", "sigma0", "sigma1", "rho", "sigmaW",
 		"gamma", "alpha"))
 	attr(v2[[elementName]], "type") <- "par for aorta model"
 
-# psa 
-growthParameterNames <- 
+# psa
+growthParameterNames <-
 		c("beta1", "beta0", "logSigma1", "logSigma0", "atanhRho", "logSigmaW")
 ruptureParameterNames <- c("alpha", "gamma")
 
@@ -72,7 +72,7 @@ ruptureParameterNames <- c("alpha", "gamma")
 v1distributions$meanForGrowthParameters <- setType(
 		c(0.0583881, 1.2715220, -3.3182980, -1.7377350, 0.4550168, -2.5868550),
 		"hyperpars for aorta model")
-		
+
 v1distributions$covarianceForGrowthParameters <- setType(
 		matrix(nrow=6, data=c(
 		1.99e-06, 1.71e-06, 0.0000000, 0.000e+00, 0.000e+00, 0.00e+00,
@@ -84,7 +84,7 @@ v1distributions$covarianceForGrowthParameters <- setType(
 		"hyperpars for aorta model")
 
 # Bivariate normal distribution
-v1distributions$meanForRuptureParameters <- 
+v1distributions$meanForRuptureParameters <-
 		setType(c(7.210208, -16.26293),	"hyperpars for aorta model")
 v1distributions$covarianceForRuptureParameters <- setType(
 		matrix(nrow=2, data=c(
@@ -93,10 +93,10 @@ v1distributions$covarianceForRuptureParameters <- setType(
 "hyperpars for aorta model")
 
 names(v1distributions$meanForGrowthParameters) <- growthParameterNames
-dimnames(v1distributions$covarianceForGrowthParameters) <- 
+dimnames(v1distributions$covarianceForGrowthParameters) <-
 		list(growthParameterNames, growthParameterNames)
 names(v1distributions$meanForRuptureParameters) <- ruptureParameterNames
-dimnames(v1distributions$covarianceForRuptureParameters) <- 
+dimnames(v1distributions$covarianceForRuptureParameters) <-
 		list(ruptureParameterNames, ruptureParameterNames)
 
 ################################################################################
@@ -104,7 +104,9 @@ dimnames(v1distributions$covarianceForRuptureParameters) <-
 
 # Surveillance intervals
 v1other$aortaDiameterThresholds <- c(3.0, 4.5, 5.5)
-v1other$monitoringIntervals <- c(1, 0.25)
+# v1other$monitoringIntervals <- c(1, 0.25)
+v1other$monitoringIntervals <- c(Inf, 1, 0.25)
+v1other$maxNumberMonitor <- c(Inf, Inf, Inf)
 
 # Dropout rate from surveillance
 v2$rateOfDropoutFromMonitoring <- setType(0.01430178 * 4, "rate")  # see below
@@ -205,15 +207,19 @@ v1distributions$probOfEmergencySurgeryIsOpen <-
 		setType(v2$probOfEmergencySurgeryIsOpen, "fixed value for probability")
 
 # Model for peri/post-operative mortality		
-v1other$emergencySurgeryAaaDeathMethod <- "instantDeathOnly"
+# v1other$emergencySurgeryAaaDeathMethod <- "instantDeathOnly"
+ v1other$emergencySurgeryAaaDeathMethod <- "survivalModel"
 
 # EVAR 30-day operative mortality
-# No emergency EVARs
+ v2$probOfAaaDeathInInitialPeriodAfterEmergencyEvarSurgery <- setType(1, "probability") 
 
 # Open repair 30-day operative mortality
-v2$probOfDieFromEmergencySurgery <- setType(0.342, "probability")
-v1distributions$probOfDieFromEmergencySurgery <- 
-		setType(list(alpha=66, beta=127), "beta pars for probability")
+v2$probOfAaaDeathInInitialPeriodAfterEmergencyOpenSurgery <- setType(0.342, "probability")
+v1distributions$probOfAaaDeathInInitialPeriodAfterEmergencyOpenSurgery <-
+  setType(list(alpha=66, beta=127), "beta pars for probability")
+# v2$probOfDieFromEmergencySurgery <- setType(0.342, "probability")
+# v1distributions$probOfDieFromEmergencySurgery <-
+# 		setType(list(alpha=66, beta=127), "beta pars for probability")
 
 # Re-intervention rate after successful EVAR
 v2$reinterventionRatesAfterEmergencyEvar <- setType(0, "reintervention rates")
@@ -226,6 +232,14 @@ v2$reinterventionRatesAfterEmergencyOpen <- setType(0, "reintervention rates")
 v1other$reinterventionTimeBoundariesAfterEmergencyOpen <- numeric()
 v1distributions$reinterventionRatesAfterEmergencyOpen <- 
 		setType(v2$reinterventionRatesAfterEmergencyOpen, "fixed value for reintervention rates")
+
+# Long-term rate of death after EVAR
+v2$rateOfAaaDeathAfterEmergencyEvarSurgeryAndInitialPeriod <-
+    setType(1e-100, "rate")
+
+# Long-term rate of death after Open
+v2$rateOfAaaDeathAfterEmergencyOpenSurgeryAndInitialPeriod <-
+  setType(1e-100, "rate")
 
 ################################################################################
 # COSTS
