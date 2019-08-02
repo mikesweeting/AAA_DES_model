@@ -109,11 +109,7 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100,
   nonAAA <- column_to_rownames(nonAAA, var = "Age")
   v1other$nonAaaMortalityRatesFileName <- nonAAA ## allow dataset to be given instead of a csv file name. Change readMortalityRatesFromFile 
 
-  #v0 <- compactList() 
-  #v1distributions <- compactList() 
-  #v1other <- compactList() 
-  #v2 <- compactList() 
-  
+
   ## For now always set these to "survivalModel"
   v1other$electiveSurgeryAaaDeathMethod <- "survivalModel"
   v1other$emergencySurgeryAaaDeathMethod <- "survivalModel"
@@ -330,9 +326,14 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100,
   ## If prevalence is NA then set to NULL
   if(is.na(v2$prevalence)){
     v2$prevalence <- NULL
+    v1distributions$prevalence <- NULL
   }
   
-
+  # print(v0)
+  # print(v1other)
+  # print(v2)
+  # print(v1distributions)
+  
   ## Replace any inputs with user-defined inputs from AAA_DES
   for(l in 1:length(extraInputs)){
     if(length(extraInputs[[l]]) > 0){
@@ -975,7 +976,8 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 	
 	repeat {
 		# Make sure that all the scheduled times are different (exclude NAs and Infinities -- MS added 24/07/2019).
-		if (!allDifferent(scheduledEvents)) {
+	  # Allow censored == monitored - Added by MS 02/08/19
+		if (!allDifferent(scheduledEvents) & scheduledEvents["censored"] != scheduledEvents["monitor"]) {
 			print(scheduledEvents)
 			stop("scheduledEvents times must all be different")
 		}

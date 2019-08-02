@@ -283,8 +283,8 @@ v1distributions$rateOfNonAaaDeathAfterContraindication <- setType(list(
 		shape=41, scale=4*0.0015), "gamma pars for rate")
 
 # Overall QoL / utilities
-v1other <- compactList(append(v1other, 
-		createQalyFactors(startAge=v1other$startAge)))
+# v1other <- compactList(append(v1other, 
+# 		createQalyFactors(startAge=v1other$startAge)))
 
 # Discount rates
 v1other$lifeYearDiscountRate <- 3.5 / 100
