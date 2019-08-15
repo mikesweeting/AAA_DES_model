@@ -38,45 +38,24 @@ dataFile <- "input/DES_Data_Input_Men30years.xlsx"
 result <- AAA_DES(dataFile, n = 4000, extraInputs = list(v0 = v0, v1other = v1other, v1distributions = v1distributions, v2 = v2))
 result$meanQuantities
 # N = 4000
-# quantity
-# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys discountedCost
-# noScreening  18.10899 13.85543 324.5499            12.60154        9.680067       198.7866
-# screening    18.11269 13.85828 360.8601            12.60589        9.683387       234.5935
+# > result$meanQuantities
+# lifeYears       qalys      cost discountedLifeYears discountedQalys discountedCost
+# noScreening 18.24949156 13.96232845 339.04724        12.692681384     9.749719831      213.26114
+# screening   18.26480492 13.97390777 386.67075        12.701752542     9.756594846      261.17318
+# difference   0.01531336  0.01157933  47.62351         0.009071158     0.006875014       47.91204
 
 ## Checking PSA
 psaResult <- AAA_DES(dataFile, psa = TRUE, n = 1000, nPSA = 5, extraInputs = list(v0 = v0, v1other = v1other, v1distributions = v1distributions, v2 = v2))
 psaResult$psaQuantities
-# , , psaIterationNumber = 1
-# 
-# quantity
-# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys discountedCost
-# noScreening  17.76545 13.59409 266.4822            12.37555        9.507775       160.4007
-# screening    17.77936 13.60473 263.4916            12.38542        9.515340       170.2054
-# 
-# , , psaIterationNumber = 2
-# 
-# quantity
-# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys discountedCost
-# noScreening  18.00855 13.78001 241.0811            12.53847        9.632767       151.6118
-# screening    18.11217 13.85828 373.7630            12.59885        9.678487       255.3200
-# 
-# , , psaIterationNumber = 3
-# 
-# quantity
-# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys discountedCost
-# noScreening  17.97057 13.75310 252.8323            12.55992        9.650109       152.5875
-# screening    18.00317 13.77776 342.6041            12.57969        9.665109       222.5807
-# 
-# , , psaIterationNumber = 4
-# 
-# quantity
-# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys discountedCost
-# noScreening  17.95788 13.74312 233.1701            12.53848        9.633691       166.4996
-# screening    18.04479 13.80859 311.4383            12.58549        9.669165       226.8802
-# 
-# , , psaIterationNumber = 5
-# 
-# quantity
-# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys discountedCost
-# noScreening  18.00159 13.77507 220.9574            12.54420        9.637297       128.6028
-# screening    18.03720 13.80191 324.7027            12.56262        9.651207       203.7491
+# lifeYears       qalys     cost discountedLifeYears discountedQalys discountedCost ICER_lifeYears
+# 1 0.01595923 0.012056904 54.02139         0.009190811     0.006959797       52.62440       3384.962
+# 2 0.01902521 0.014382362 45.45276         0.011046226     0.008372749       45.42861       2389.080
+# 3 0.01258667 0.009497967 42.96374         0.007245606     0.005478409       43.08668       3413.431
+# 4 0.01554312 0.011728462 48.43916         0.008754702     0.006619352       48.40103       3116.437
+# 5 0.02327185 0.017565009 55.93527         0.013235683     0.010012087       54.72286       2403.559
+# ICER_discountedLifeYears ICER_discountedQalys INMB_discountedQalys_20000 INMB_discountedQalys_30000
+# 1                 5725.762             7561.197                   86.57154                   156.1695
+# 2                 4112.591             5425.770                  122.02637                   205.7539
+# 3                 5946.595             7864.816                   66.48150                   121.2656
+# 4                 5528.575             7312.049                   83.98602                   150.1795
+# 5                 4134.495             5465.680                  145.51887                   245.6397

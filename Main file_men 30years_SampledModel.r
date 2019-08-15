@@ -23,6 +23,9 @@ v0$randomSeed <- 2
 v0$numberOfProcesses <- detectCores()-1 ## use number cores minus 1 to allow machine to still function
 v0 <- setUnspecifiedElementsOfv0(v0)
 
+## MS added on 15/08/2019 - DES model now needs monitoring interval for sub-aneurysmal. Add
+v1other$monitoringIntervals <- c(1, v1other$monitoringIntervals)
+
 # Analysis. 
 cat("##### SWAN men 30years model: sampled model", date(), "(runIdentifier=", runIdentifier, ")",sep=" ")
 

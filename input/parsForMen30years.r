@@ -10,112 +10,111 @@ if (!exists("v2")) v2 <- compactList()
 ################################################################################
 # MISCELLANEOUS
 
-# v1other$postSurgeryInitialPeriod <- 30 / 365.25  # = 0.08213552
+v1other$postSurgeryInitialPeriod <- 30 / 365.25  # = 0.08213552
 
-# v1other$startAge <- 65
+v1other$startAge <- 65
 
-# v0$generateCensoringTime <- function() { 30.000001 }
+v0$generateCensoringTime <- function() { 30.000001 }
 
 # Post-surgery monitoring. 
-# v1other$timeToMonitoringFollowingOpenSurgery <- 100
-# v1other$timeBetweenMonitoringFollowingEvarSurgery <- NA
+v1other$timeToMonitoringFollowingOpenSurgery <- 100
+v1other$timeBetweenMonitoringFollowingEvarSurgery <- NA
 
 # No growth for men with a diameter of < 2cm 
-# v1other$zeroGrowthDiameterThreshold <- 2.0 
+v1other$zeroGrowthDiameterThreshold <- 2.0
 
 ################################################################################
 # SCREENING
 
 # Re-invitation proportion
-# v2$probOfRequireReinvitation <- setType(0.1360, "probability")
-# v1distributions$probOfRequireReinvitation <- 
-# 		setType(list(alpha=4602, beta=29237), "beta pars for probability")
+v2$probOfRequireReinvitation <- setType(0.1360, "probability")
+v1distributions$probOfRequireReinvitation <-
+		setType(list(alpha=4602, beta=29237), "beta pars for probability")
 
 # Attendance proportion
-# v2$probOfAttendScreen <- setType(0.750, "probability")
-# v1distributions$probOfAttendScreen <- 
-# 		setType(list(alpha=93170, beta=31022), "beta pars for probability")
+v2$probOfAttendScreen <- setType(0.750, "probability")
+v1distributions$probOfAttendScreen <-
+		setType(list(alpha=93170, beta=31022), "beta pars for probability")
 
 # Non-visualisation proportion
-# v2$probOfNonvisualization <- setType(0.0121, "probability")
-# v1distributions$probOfNonvisualization <- 
-# 		setType(list(alpha=329, beta=26818), "beta pars for probability")
+v2$probOfNonvisualization <- setType(0.0121, "probability")
+v1distributions$probOfNonvisualization <-
+		setType(list(alpha=329, beta=26818), "beta pars for probability")
 		
 # Prevalence proportion
-# fileName <- "input/AAA max measurements.csv"
-# v1other$baselineDiameters <- read.csv(fileName, comment.char="#")[, c("size", "pw")]
-# names(v1other$baselineDiameters) <- c("size", "weight")
+fileName <- "input/AAA max measurements.csv"
+v1other$baselineDiameters <- read.csv(fileName, comment.char="#")[, c("size", "pw")]
+names(v1other$baselineDiameters) <- c("size", "weight")
 
-# v1other$prevalenceThreshold<-3.0
+v1other$prevalenceThreshold<-3.0
 
 ################################################################################
 # AAA GROWTH & RUPTURE
 
-# v2$beta0 <- 1.27152200
-# v2$beta1 <- 0.05838810
-# v2$sigma0 <- exp(-1.737735221)
-# v2$sigma1 <- exp(-3.318297793)
-# v2$rho <- tanh(0.455016818)
-# v2$sigmaW <- exp(-2.586854985)
-# v2$gamma <- -16.26293
-# v2$alpha <- 7.210208
-# for (elementName in c("beta0", "beta1", "sigma0", "sigma1", "rho", "sigmaW",
-# 		"gamma", "alpha"))
-# 	attr(v2[[elementName]], "type") <- "par for aorta model"
+v2$beta0 <- 1.27152200
+v2$beta1 <- 0.05838810
+v2$sigma0 <- exp(-1.737735221)
+v2$sigma1 <- exp(-3.318297793)
+v2$rho <- tanh(0.455016818)
+v2$sigmaW <- exp(-2.586854985)
+v2$gamma <- -16.26293
+v2$alpha <- 7.210208
+for (elementName in c("beta0", "beta1", "sigma0", "sigma1", "rho", "sigmaW",
+		"gamma", "alpha"))
+	attr(v2[[elementName]], "type") <- "par for aorta model"
 
 # psa
-# growthParameterNames <-
-# 		c("beta1", "beta0", "logSigma1", "logSigma0", "atanhRho", "logSigmaW")
-# ruptureParameterNames <- c("alpha", "gamma")
-# 
+growthParameterNames <-
+		c("beta1", "beta0", "logSigma1", "logSigma0", "atanhRho", "logSigmaW")
+ruptureParameterNames <- c("alpha", "gamma")
+
 # # Hexavariate normal distribution
-# v1distributions$meanForGrowthParameters <- setType(
-# 		c(0.0583881, 1.2715220, -3.3182980, -1.7377350, 0.4550168, -2.5868550),
-# 		"hyperpars for aorta model")
-# 
-# v1distributions$covarianceForGrowthParameters <- setType(
-# 		matrix(nrow=6, data=c(
-# 		1.99e-06, 1.71e-06, 0.0000000, 0.000e+00, 0.000e+00, 0.00e+00,
-# 		1.71e-06, 3.01e-05, 0.0000000, 0.000e+00, 0.000e+00, 0.00e+00,
-# 		0.00e+00, 0.00e+00, 0.0017140, -1.880e-05, 4.828e-04, -6.77e-05,
-# 		0.00e+00, 0.00e+00, -0.0000188, 5.283e-04, 4.840e-05, -1.42e-06,
-# 		0.00e+00, 0.00e+00, 0.0004828, 4.840e-05, 2.588e-03, 9.26e-06,
-# 		0.00e+00, 0.00e+00, -0.0000677, -1.420e-06, 9.260e-06, 8.09e-05)),
-# 		"hyperpars for aorta model")
-# 
+v1distributions$meanForGrowthParameters <- setType(
+		c(0.0583881, 1.2715220, -3.3182980, -1.7377350, 0.4550168, -2.5868550),
+		"hyperpars for aorta model")
+
+v1distributions$covarianceForGrowthParameters <- setType(
+		matrix(nrow=6, data=c(
+		1.99e-06, 1.71e-06, 0.0000000, 0.000e+00, 0.000e+00, 0.00e+00,
+		1.71e-06, 3.01e-05, 0.0000000, 0.000e+00, 0.000e+00, 0.00e+00,
+		0.00e+00, 0.00e+00, 0.0017140, -1.880e-05, 4.828e-04, -6.77e-05,
+		0.00e+00, 0.00e+00, -0.0000188, 5.283e-04, 4.840e-05, -1.42e-06,
+		0.00e+00, 0.00e+00, 0.0004828, 4.840e-05, 2.588e-03, 9.26e-06,
+		0.00e+00, 0.00e+00, -0.0000677, -1.420e-06, 9.260e-06, 8.09e-05)),
+		"hyperpars for aorta model")
+
 # # Bivariate normal distribution
-# v1distributions$meanForRuptureParameters <-
-# 		setType(c(7.210208, -16.26293),	"hyperpars for aorta model")
-# v1distributions$covarianceForRuptureParameters <- setType(
-# 		matrix(nrow=2, data=c(
-# 		1.001459, -1.650784,
-# 		-1.650784, 2.758093)),
-# "hyperpars for aorta model")
-# 
-# names(v1distributions$meanForGrowthParameters) <- growthParameterNames
-# dimnames(v1distributions$covarianceForGrowthParameters) <-
-# 		list(growthParameterNames, growthParameterNames)
-# names(v1distributions$meanForRuptureParameters) <- ruptureParameterNames
-# dimnames(v1distributions$covarianceForRuptureParameters) <-
-# 		list(ruptureParameterNames, ruptureParameterNames)
+v1distributions$meanForRuptureParameters <-
+		setType(c(7.210208, -16.26293),	"hyperpars for aorta model")
+v1distributions$covarianceForRuptureParameters <- setType(
+		matrix(nrow=2, data=c(
+		1.001459, -1.650784,
+		-1.650784, 2.758093)),
+"hyperpars for aorta model")
+
+names(v1distributions$meanForGrowthParameters) <- growthParameterNames
+dimnames(v1distributions$covarianceForGrowthParameters) <-
+		list(growthParameterNames, growthParameterNames)
+names(v1distributions$meanForRuptureParameters) <- ruptureParameterNames
+dimnames(v1distributions$covarianceForRuptureParameters) <-
+		list(ruptureParameterNames, ruptureParameterNames)
 
 ################################################################################
 # SURVEILLANCE
 
 # Surveillance intervals
-# v1other$aortaDiameterThresholds <- c(3.0, 4.5, 5.5)
-# v1other$monitoringIntervals <- c(1, 0.25)
-# v1other$monitoringIntervals <- c(1, 1, 0.25)
-# v1other$maxNumberMonitor <- c(Inf, Inf, Inf)
+v1other$aortaDiameterThresholds <- c(3.0, 4.5, 5.5)
+v1other$monitoringIntervals <- c(1, 0.25)
+v1other$maxNumberMonitor <- c(Inf, Inf, Inf)
 
 # Dropout rate from surveillance
-# v2$rateOfDropoutFromMonitoring <- setType(0.01430178 * 4, "rate")  # see below
-# v1distributions$rateOfDropoutFromMonitoring <- setType(list(
-# 		shape=330, scale=4*4.34e-5), "gamma pars for rate")  
+v2$rateOfDropoutFromMonitoring <- setType(0.01430178 * 4, "rate")  # see below
+v1distributions$rateOfDropoutFromMonitoring <- setType(list(
+		shape=330, scale=4*4.34e-5), "gamma pars for rate")
 
 # # Incidental detection rate
-# v2$rateOfIncidentalDetection <- 
-# 		setType(convertThreeMonthProbToRate(0.0114), "rate")
+v2$rateOfIncidentalDetection <-
+		setType(convertThreeMonthProbToRate(0.0114), "rate")
 v1distributions$rateOfIncidentalDetection <-
 		setType(list(alpha=19.55672, beta=1695.94546), 
 		"pars for betaThenConvertThreeMonthProbToRate")
@@ -283,8 +282,8 @@ v1distributions$rateOfNonAaaDeathAfterContraindication <- setType(list(
 		shape=41, scale=4*0.0015), "gamma pars for rate")
 
 # Overall QoL / utilities
-# v1other <- compactList(append(v1other, 
-# 		createQalyFactors(startAge=v1other$startAge)))
+v1other <- compactList(append(v1other,
+		createQalyFactors(startAge=v1other$startAge)))
 
 # Discount rates
 v1other$lifeYearDiscountRate <- 3.5 / 100
