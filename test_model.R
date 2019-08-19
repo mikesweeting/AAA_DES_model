@@ -72,40 +72,20 @@ result$eventHistories[which(lapply(1:length(result$eventHistories),singleEvent,r
 ## Checking PSA
 psaResult <- AAA_DES(dataFile, psa = TRUE, n = 1000, nPSA = 5)
 psaResult$psaQuantities
-# , , psaIterationNumber = 1
-# 
-# quantity
-# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys discountedCost
-# noScreening  20.38234 15.13479 124.3853            13.85769        10.39256       83.20855
-# screening    20.37787 15.13162 169.8306            13.85568        10.39114      121.74305
-# 
-# , , psaIterationNumber = 2
-# 
-# quantity
-# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys discountedCost
-# noScreening  20.02354 14.87621 42.28306            13.65622        10.24650       25.91398
-# screening    20.01804 14.87230 50.95675            13.65316        10.24433       41.30984
-# 
-# , , psaIterationNumber = 3
-# 
-# quantity
-# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys discountedCost
-# noScreening  20.52723 15.23731 41.15310            13.92178        10.43773       20.65710
-# screening    20.53599 15.24353 64.51885            13.92557        10.44042       43.76747
-# 
-# , , psaIterationNumber = 4
-# 
-# quantity
-# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys discountedCost
-# noScreening  20.27296 15.05948 96.06096            13.81338        10.36319       48.94300
-# screening    20.27416 15.06033 50.00896            13.81381        10.36349       38.12288
-# 
-# , , psaIterationNumber = 5
-# 
-# quantity
-# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys discountedCost
-# noScreening  20.12834 14.95018 32.31138            13.69691        10.27506       18.88779
-# screening    20.12834 14.95018 45.87008            13.69691        10.27506       37.95312
+# > psaResult$psaQuantities
+# lifeYears        qalys     cost discountedLifeYears discountedQalys discountedCost ICER_lifeYears
+# 1 0.0041241399 0.0029557887 34.76256        0.0022464183    0.0016156062       31.79993       8429.045
+# 2 0.0017035121 0.0012162766 31.80846        0.0009023484    0.0006457528       30.16973      18672.284
+# 3 0.0013331032 0.0009517425 28.28379        0.0006979471    0.0004993879       26.87437      21216.504
+# 4 0.0008241431 0.0005852049 32.42316        0.0004549908    0.0003229937       31.07872      39341.663
+# 5 0.0022636503 0.0016221360 33.12514        0.0012635369    0.0009081381       31.65814      14633.507
+# ICER_discountedLifeYears ICER_discountedQalys INMB_discountedQalys_20000 INMB_discountedQalys_30000
+# 1                 14155.83             19682.97                  0.5121978                  16.668260
+# 2                 33434.68             46720.24                -17.2546713                 -10.797143
+# 3                 38504.88             53814.62                -16.8866136                 -11.892734
+# 4                 68306.26             96220.81                -24.6188438                 -21.388906
+# 5                 25055.17             34860.48                -13.4953732                  -4.413992
+
 
 
 ## TO DO

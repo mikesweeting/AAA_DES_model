@@ -2566,9 +2566,9 @@ generateV2 <- function(v1distributions) {
 			"gamma", "alpha"))
 		attr(v2[[elementName]], "type") <- "par for aorta model"
 	
-	if ("prevalenceDistribution" %in% names(v1other))
-		stop("code in generateV2 for dealing with ",
-				"v1other$prevalenceDistribution \n has not yet been written")
+	# if ("prevalenceDistribution" %in% names(v1other))
+	# 	stop("code in generateV2 for dealing with ",
+	# 			"v1other$prevalenceDistribution \n has not yet been written")
 	
 	return(v2)
 }
