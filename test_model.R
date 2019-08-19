@@ -38,32 +38,30 @@ result <- AAA_DES(dataFile, n = 4000)
 result$meanQuantities
 # N = 4000
 # quantity
-# treatmentGroup lifeYears    qalys      cost discountedLifeYears discountedQalys discountedCost
-# noScreening  20.29571 15.07328  80.07796            13.80255        10.35351       41.54997
-# screening    20.30187 15.07777 112.05991            13.80629        10.35625       75.19093
+# lifeYears        qalys      cost discountedLifeYears discountedQalys discountedCost
+# noScreening 20.523800526 15.235780413  87.39073        13.925316679    10.441022438       43.85291
+# screening   20.526575058 15.237762766 123.60674        13.926808177    10.442090453       77.88237
+# difference   0.002774532  0.001982354  36.21601         0.001491497     0.001068015       34.02946
 
 ## N = 1000
 # v0$numberOfPersons <- 1000
 result <- AAA_DES(dataFile, n = 1000)
 result$meanQuantities
 # quantity
-# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys
-# noScreening  20.10800 14.93558 36.35599            13.68607        10.26736
-# screening    20.10654 14.93454 34.29114            13.68546        10.26693
-# quantity
-# treatmentGroup discountedCost
-# noScreening       19.22805
-# screening         31.37802
+# lifeYears        qalys      cost discountedLifeYears discountedQalys discountedCost
+# noScreening 20.786882570 15.424169289 137.40919         14.07508309      10.5486484       62.82293
+# screening   20.789555991 15.426080535 172.98851         14.07653061      10.5496857       96.49565
+# difference   0.002673421  0.001911246  35.57932          0.00144752       0.0010373       33.67272
 
 ## N=10,000
 # v0$numberOfPersons <- 10000
 result <- AAA_DES(dataFile, n = 10000)
 result$meanQuantities
 ## 
-# quantity
-# treatmentGroup lifeYears    qalys      cost discountedLifeYears discountedQalys discountedCost
-# noScreening  20.43834 15.17537  90.51524            13.88279        10.41109       48.58817
-# screening    20.43857 15.17555 121.74456            13.88315        10.41136       80.37521
+# lifeYears        qalys      cost discountedLifeYears discountedQalys discountedCost
+# noScreening 20.530564252 15.240653628  97.07479        13.927591026    10.442723963       51.18366
+# screening   20.533349740 15.242645517 133.25672        13.929090443    10.443799022       85.18490
+# difference   0.002785488  0.001991889  36.18193         0.001499417     0.001075058       34.00124
 
 ## cheking whether there are any discharge events (if v1other$maxNumberMonitor is not set to Inf)
 sum(unlist(lapply(1:length(result$eventHistories),singleEvent,result,treatmentGroup="screening",event="discharged")))

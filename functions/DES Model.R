@@ -697,10 +697,19 @@ processOnePair <- function(personNumber, v0, v1other, v2) {
 	
 	# Generate boolean variables (v3) for v2 elements of type "probability". 
 	for (elementName in sort(names(v2))) {
-		if (elementName %in% namesOfProbVarsForSurvivalModel) next
-		v2element <- v2[[elementName]]
-		if (getType(v2element) == "probability")
-			v3[[elementName]] <- setType(rbernoulli(v2element), "boolean")
+	  ## Making changes here so that Uniform RV is generated for each pair to represent propensity of event occuring
+	  ## Only need to do this for logistic regression events (as these depend on age at event so cannot generate Binomial RV at this stage)
+	  ## This reduces MC error in event generation
+	  #if (elementName %in% namesOfProbVarsForSurvivalModel) { ## Not sure why this was needed
+	  v2element <- v2[[elementName]]
+	  
+	  if (getType(v2element) == "logistic model for probability"){
+	    v3[[elementName]] <- setType(runif(1), "propensity")
+	    next
+	  } 
+	  
+	  if (getType(v2element) == "probability")
+	    v3[[elementName]] <- setType(rbernoulli(v2element), "boolean")
 	}
 
 	# Generate censoring-time.
@@ -1050,10 +1059,18 @@ processControlOnly <- function(personNumber, v0, v1other, v2, updateProgress) {
   # decideOnElectiveSurgery. Go through the elements of v2 and for those that 
   # have type "probability", generate a boolean element of v3. (If it has 
   # type "logistic model for probability" then deal with it elsewhere. 
-  # Also exclude ones that are in namesOfProbVarsForSurvivalModel.)
-  for (elementName in names(v2)) {
-    if (elementName %in% namesOfProbVarsForSurvivalModel) next
+  ## Making changes here so that Uniform RV is generated for each pair to represent propensity of event occuring
+  ## Only need to do this for logistic regression events (as these depend on age at event so cannot generate Binomial RV at this stage)
+  ## This reduces MC error in event generation
+  #if (elementName %in% namesOfProbVarsForSurvivalModel) { ## Not sure why this was needed
+  
+  for (elementName in sort(names(v2))) {
     v2element <- v2[[elementName]]
+    if (getType(v2element) == "logistic model for probability") {
+      v3[[elementName]] <- setType(runif(1), "propensity")
+      next
+    }
+    
     if (getType(v2element) == "probability")
       v3[[elementName]] <- setType(rbernoulli(v2element), "boolean")
   }
@@ -1728,7 +1745,7 @@ getBinaryVariable <- function(varName, v1other, v2, v3, eventTime) {
 		stop("eventTime must be a single non-negative numeric")
 	
 	# Get the result.
-	if (varName %in% names(v3)) {
+	if (varName %in% names(v3) & getType(v2[[varName]]) != "logistic model for probability") {
 		if (!(getType(v3[[varName]]) %in% c("boolean", "fixed value")))
 			stop("v3$", varName, " must have type boolean or fixed value")
 		result <- v3[[varName]]
@@ -1758,12 +1775,14 @@ getBinaryVariable <- function(varName, v1other, v2, v3, eventTime) {
 		# from the Bernoulli distribution.
 		prob <- calculateProbFromLogisticModel(beta=beta, 
 				covariates=covariates, logOddsAdjustment=logOddsAdjustment)
-		result <- rbernoulli(prob)
+		# result <- rbernoulli(prob)
+		## Use propensity to calculate whether event occurs or not
+		result <- prob > v3[[varName]]
 		
-	} else if (varName %in% names(v2) && 
-			getType(v2[[varName]]) == "probability" && 
-			varName %in% namesOfProbVarsForSurvivalModel) {
-		result <- rbernoulli(v2[[varName]])
+	# } else if (varName %in% names(v2) && 
+	# 		getType(v2[[varName]]) == "probability" && 
+	# 		varName %in% namesOfProbVarsForSurvivalModel) {
+	# 	result <- rbernoulli(v2[[varName]])
 		
 	} else {
 		cat("\n\nvarName=", varName, "\nv2:\n", sep=""); print(v2); 
