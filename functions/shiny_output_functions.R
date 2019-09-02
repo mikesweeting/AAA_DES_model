@@ -1,18 +1,33 @@
-screen.detected<-function(i,personsInfo,v1other){
+screen.detected <- function(i,personsInfo,v1other){
   # Screen-detected AAA
   if (("screen" %in% personsInfo$eventHistories[[i]][["screening"]]$events && 
        !("nonvisualization" %in% personsInfo$eventHistories[[i]][["screening"]]$events) &&
        (personsInfo$eventHistories[[i]][["screening"]]$measuredSizes[match("screen", personsInfo$eventHistories
                                                                            [[i]][["screening"]]$events)] >= 
-        v1other$aortaDiameterThresholds[1])))
-    1 else 0
+        v1other$aortaDiameterThresholds[1]))){
+    num <- 1
+    which.min <- min(which(personsInfo$eventHistories[[i]][["screening"]]$events=="screen"))
+    firsttime <- personsInfo$eventHistories[[i]][["screening"]]$times[which.min]
+  } else {
+    num <- 0
+    firsttime <- NA
+  }
+  attr(num, "firsttime") <- firsttime
+  return(num)
 }
+
 incidentally.detected<-function(i,personsInfo,treatmentGroup,v1other){
   # Number of women with incidentally detected AAAs and no screen detection
   if(treatmentGroup=="noScreening"){
     ## No screening group
-    if (("incidentalDetection" %in% personsInfo$eventHistories[[i]][["noScreening"]]$events))
-      num<-1 else num<-0
+    if (("incidentalDetection" %in% personsInfo$eventHistories[[i]][["noScreening"]]$events)){
+      num <- 1
+      which.min <- min(which(personsInfo$eventHistories[[i]][["noScreening"]]$events=="incidentalDetection"))
+      firsttime <- personsInfo$eventHistories[[i]][["noScreening"]]$times[which.min]
+    } else {
+      num <- 0
+      firsttime <- NA
+    }
   }
   ## screening group
   if(treatmentGroup=="screening"){
@@ -21,25 +36,47 @@ incidentally.detected<-function(i,personsInfo,treatmentGroup,v1other){
              !("nonvisualization" %in% personsInfo$eventHistories[[i]][["screening"]]$events) &&
              (personsInfo$eventHistories[[i]][["screening"]]$measuredSizes[match("screen", personsInfo$eventHistories
                                                                                  [[i]][["screening"]]$events)] >= 
-              v1other$aortaDiameterThresholds[1])))
-      num<-1 else num<-0
+              v1other$aortaDiameterThresholds[1]))){
+      num <- 1
+      which.min <- min(which(personsInfo$eventHistories[[i]][["screening"]]$events=="incidentalDetection"))
+      firsttime <- personsInfo$eventHistories[[i]][["screening"]]$times[which.min]
+    } else {
+      num <- 0
+      firsttime <- NA
+    }
   }  
+  attr(num, "firsttime") <- firsttime
   return(num)
 }  
-elective.repair<-function(i,personsInfo,treatmentGroup){
+
+elective.repair <- function(i,personsInfo,treatmentGroup){
   if("electiveSurgeryOpen" %in% personsInfo$eventHistories[[i]][[treatmentGroup]]$events | 
      "electiveSurgeryEvar" %in% personsInfo$eventHistories[[i]][[treatmentGroup]]$events){
     num<-1 
-  } else num<-0
+    which.min <- min(which(personsInfo$eventHistories[[i]][[treatmentGroup]]$events %in% c("electiveSurgeryOpen", "electiveSurgeryEvar")))
+    firsttime <- personsInfo$eventHistories[[i]][[treatmentGroup]]$times[which.min]
+  } else {
+    num<-0
+    firsttime <- NA
+  }
+  attr(num, "firsttime") <- firsttime
   return(num)
 }
-emergency.repair<-function(i,personsInfo,treatmentGroup){
+
+emergency.repair <- function(i,personsInfo,treatmentGroup){
   if("emergencySurgeryOpen" %in% personsInfo$eventHistories[[i]][[treatmentGroup]]$events | 
      "emergencySurgeryEvar" %in% personsInfo$eventHistories[[i]][[treatmentGroup]]$events){
     num<-1 
-  } else num<-0
+    which.min <- min(which(personsInfo$eventHistories[[i]][[treatmentGroup]]$events %in% c("emergencySurgeryOpen", "emergencySurgeryEvar")))
+    firsttime <- personsInfo$eventHistories[[i]][[treatmentGroup]]$times[which.min]
+  } else {
+    num<-0
+    firsttime <- NA
+  }
+  attr(num, "firsttime") <- firsttime
   return(num)
 }
+
 aaaDeathElective<-function(i,personsInfo,treatmentGroup){
   if("aaaDeath" %in% personsInfo$eventHistories[[i]][[treatmentGroup]]$events & 
      ("electiveSurgeryEvar" %in% personsInfo$eventHistories[[i]][[treatmentGroup]]$events |
@@ -48,10 +85,16 @@ aaaDeathElective<-function(i,personsInfo,treatmentGroup){
   } else num<-0
   return(num)
 }
-singleEvent<-function(i,personsInfo,treatmentGroup,event){
+singleEvent <- function(i,personsInfo,treatmentGroup,event){
   if(event %in% personsInfo$eventHistories[[i]][[treatmentGroup]]$events){
-    num<-1
-  }  else num<-0
+    num <-1
+    which.min <- min(which(personsInfo$eventHistories[[i]][[treatmentGroup]]$events == event))
+    firsttime <- personsInfo$eventHistories[[i]][[treatmentGroup]]$times[which.min]
+  }  else {
+    num<-0
+    firsttime <- NA
+  }
+  attr(num, "firsttime") <- firsttime
   return(num)
 }
 
@@ -74,7 +117,7 @@ tab.ce<-function(res=NULL,res.sampled){
 }
 
 ## Events table
-tab.events<-function(personsInfo,personsInfoDifference=NULL,v0,v1other){
+tab.events <- function(personsInfo,personsInfoDifference=NULL,v0,v1other){
   n<-length(personsInfo$eventHistories)
   df<-data.frame("ns"=NA,"s"=NA)
   rownames(df)[1]<-"AAAs detected"
@@ -83,6 +126,8 @@ tab.events<-function(personsInfo,personsInfoDifference=NULL,v0,v1other){
   df["Incidentally detected","ns"]<-sum(unlist(lapply(1:n,incidentally.detected,personsInfo,treatmentGroup="noScreening",v1other=v1other)))
   df["Incidentally detected","s"]<-sum(unlist(lapply(1:n,incidentally.detected,personsInfo,treatmentGroup="screening",v1other=v1other)))
   df["AAAs detected",]<-df["Screen detected",]+df["Incidentally detected",]
+  df["Consultation for elective AAA repair","ns"]<-sum(unlist(lapply(1:n,singleEvent,personsInfo,treatmentGroup="noScreening",event="consultation")))
+  df["Consultation for elective AAA repair","s"]<-sum(unlist(lapply(1:n,singleEvent,personsInfo,treatmentGroup="screening",event="consultation")))
   df["Elective AAA repair","ns"]<-sum(unlist(lapply(1:n,elective.repair,personsInfo,treatmentGroup="noScreening")))
   df["Elective AAA repair","s"]<-sum(unlist(lapply(1:n,elective.repair,personsInfo,treatmentGroup="screening")))
   df["Elective AAA repair contraindicated","ns"]<-sum(unlist(lapply(1:n,singleEvent,personsInfo,treatmentGroup="noScreening",event="contraindicated")))
@@ -121,8 +166,8 @@ tab.events<-function(personsInfo,personsInfoDifference=NULL,v0,v1other){
     df$perc<-paste0("(",round(100*df$diff/df$ns),"%)")
   }
   colnames(df)<-c("","","Not invited to screening","Invited to screening","Difference","(% of that in non-invited group)")
-  df[c(1,4:8,11:14),1]<-rownames(df)[c(1,4:8,11:14)]
-  df[c(2:3,9:10),2]<-rownames(df)[c(2:3,9:10)]
+  df[c(1,4:9,12:15),1]<-rownames(df)[c(1,4:9,12:15)]
+  df[c(2:3,10:11),2]<-rownames(df)[c(2:3,10:11)]
   rownames(df)<-NULL
   return(df)
 }  
@@ -305,4 +350,25 @@ eventsPlot<-function(data,event,v1other){
 }  
 
 
+## Time under surveillance 
+# (i.e. time from screen detection or incidental detection to elective or emergency surgery or death or censoring)
+## IGNORING DROPOUT AND RE-ENTERING SCREENING PROGRAMME 
+## ASSUMING SURVEILLANCE TIME IS FROM DETECTION TO DEATH / SURGERY
+surveillance.time <- function(i, personsInfo, treatmentGroup, v1other){
+  elr.time <- attributes(elective.repair(i, personsInfo, treatmentGroup))$firsttime
+  emr.time <- attributes(emergency.repair(i, personsInfo, treatmentGroup))$firsttime
+  scr.time <- attributes(screen.detected(i, personsInfo, v1other))$firsttime
+  incdet.time <- attributes(incidentally.detected(i, personsInfo, treatmentGroup, v1other))$firsttime
+  aaadeath.time <- attributes(singleEvent(i, personsInfo, treatmentGroup, event = "aaaDeath"))$firsttime
+  nonaaadeath.time <- attributes(singleEvent(i, personsInfo, treatmentGroup, event = "nonAaaDeath"))$firsttime
+  censored.time <- attributes(singleEvent(i, personsInfo, treatmentGroup, event = "censored"))$firsttime
+  end.time <- min(elr.time, emr.time, aaadeath.time, nonaaadeath.time, censored.time, na.rm=T)
+  if(!is.na(scr.time) | !is.na(incdet.time)){
+    start.time <- min(scr.time, incdet.time, na.rm = T)  
+  } else {
+    start.time <- NA
+  }
+  surv.time <- end.time - start.time
+  return(surv.time)
+}
 
