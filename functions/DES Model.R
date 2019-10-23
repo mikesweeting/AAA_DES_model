@@ -3809,7 +3809,7 @@ checkReinterventionRatesAndTimeBoundaries <- function(rates, timeBoundaries) {
 ## the person years at risk for this event, and the rate (per person-year) and risk of this event occuring before the next event (be it surveillance, dropout, death, surgery or rupture)
 ## where sizeLower <= measuredSize < sizeUpper
 eventsBySizeCat <- function(result, event, sizeLower, sizeUpper, treatmentGroup){
-  count <- pyrs <- nSizeEvents <- sumSizeEvents <- 0
+  count <- pyrs <- nSizeEvents <- sumSizeEvents <- sumSizeNextEvents <- 0
   N <- length(result$eventHistories)
   for(i in 1:N) {
     sizeEvents <- result$eventHistories[[i]][[treatmentGroup]]$measuredSizes >= sizeLower & result$eventHistories[[i]][[treatmentGroup]]$measuredSizes < sizeUpper
@@ -3817,11 +3817,16 @@ eventsBySizeCat <- function(result, event, sizeLower, sizeUpper, treatmentGroup)
     nSizeEvents <- nSizeEvents + sum(sizeEvents)
     sumSizeEvents <- sumSizeEvents + sum(result$eventHistories[[i]][[treatmentGroup]]$measuredSizes[sizeEvents])
     nextEvents <- c(FALSE, sizeEvents[-length(sizeEvents)])
-    count <- count + sum(result$eventHistories[[i]][[treatmentGroup]]$events[nextEvents] == event)
+    countNew <- result$eventHistories[[i]][[treatmentGroup]]$events[nextEvents] == event
+    count <- count + sum(countNew)
+    if(any(countNew)){
+      sumSizeNextEvents <- sumSizeNextEvents + sum(result$eventHistories[[i]][[treatmentGroup]]$trueSizes[nextEvents & result$eventHistories[[i]][[treatmentGroup]]$events == event])
+    }
     pyrs <- pyrs + sum(result$eventHistories[[i]][[treatmentGroup]]$times[nextEvents] - result$eventHistories[[i]][[treatmentGroup]]$times[sizeEvents])
   }
   return(list(events = count, pyrs = pyrs, rate = count/pyrs, nSizeEvents = nSizeEvents, 
-              risk = count / nSizeEvents, meanSizeEvents = sumSizeEvents / nSizeEvents))
+              risk = count / nSizeEvents, meanSizeEvents = sumSizeEvents / nSizeEvents,
+              meanSizeNextEvents = sumSizeNextEvents / count))
 }
 
 ## Function to ascertain size of AAA (true and as measured) at first consultation
