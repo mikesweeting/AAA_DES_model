@@ -3805,6 +3805,42 @@ checkReinterventionRatesAndTimeBoundaries <- function(rates, timeBoundaries) {
 # A cost-effectiveness analysis]
 ################################################################################
 
+## eventsBySizeCat is a function that counts events that occur after AAA is measured in a given size range
+## the person years at risk for this event, and the rate (per person-year) and risk of this event occuring before the next event (be it surveillance, dropout, death, surgery or rupture)
+## where sizeLower <= measuredSize < sizeUpper
+eventsBySizeCat <- function(result, event, sizeLower, sizeUpper, treatmentGroup){
+  count <- pyrs <- nSizeEvents <- sumSizeEvents <- 0
+  N <- length(result$eventHistories)
+  for(i in 1:N) {
+    sizeEvents <- result$eventHistories[[i]][[treatmentGroup]]$measuredSizes >= sizeLower & result$eventHistories[[i]][[treatmentGroup]]$measuredSizes < sizeUpper
+    sizeEvents[is.na(sizeEvents)] <- FALSE
+    nSizeEvents <- nSizeEvents + sum(sizeEvents)
+    sumSizeEvents <- sumSizeEvents + sum(result$eventHistories[[i]][[treatmentGroup]]$measuredSizes[sizeEvents])
+    nextEvents <- c(FALSE, sizeEvents[-length(sizeEvents)])
+    count <- count + sum(result$eventHistories[[i]][[treatmentGroup]]$events[nextEvents] == event)
+    pyrs <- pyrs + sum(result$eventHistories[[i]][[treatmentGroup]]$times[nextEvents] - result$eventHistories[[i]][[treatmentGroup]]$times[sizeEvents])
+  }
+  return(list(events = count, pyrs = pyrs, rate = count/pyrs, nSizeEvents = nSizeEvents, 
+              risk = count / nSizeEvents, meanSizeEvents = sumSizeEvents / nSizeEvents))
+}
+
+## Function to ascertain size of AAA (true and as measured) at first consultation
+## both true and measured size can be less than intervention threshold
+## measured is the confirmatory measurement taken via CT so may be less than US that prompted the consultation
+consultationSize <- function(result, treatmentGroup){
+  N <- length(result$eventHistories)
+  measured <- true <- NULL
+  for(i in 1:N) {
+    events <- result$eventHistories[[i]][[treatmentGroup]]$events == "consultation"
+    if(any(events)){
+      measured <- c(measured, min(result$eventHistories[[i]][[treatmentGroup]]$measuredSizes[result$eventHistories[[i]][[treatmentGroup]]$events == "consultation"]))
+      true <- c(true, min(result$eventHistories[[i]][[treatmentGroup]]$trueSizes[result$eventHistories[[i]][[treatmentGroup]]$events == "consultation"]))
+    }
+  }
+  return(list(measured = summary(measured), true = summary(true)))
+}
+
+
 # Functions for counting numbers of events, e.g. countEvents(personsInfo, "consultation", "noScreening")
 # NB this counts the number of people who have the event at least once, not the total number of events. 
 countEvents <- function(personsInfo, event, treatmentGroup, timeLimit=NA) {

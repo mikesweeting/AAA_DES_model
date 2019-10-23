@@ -32,16 +32,19 @@ v1other$zeroGrowthDiameterThreshold <- 2.0
 # SCREENING
 
 # Re-invitation proportion
+# SOURCE: MASS
 v2$probOfRequireReinvitation <- setType(0.1360, "probability")
 v1distributions$probOfRequireReinvitation <-
 		setType(list(alpha=4602, beta=29237), "beta pars for probability")
 
 # Attendance proportion
+# SOURCE: NAAASP
 v2$probOfAttendScreen <- setType(0.750, "probability")
 v1distributions$probOfAttendScreen <-
 		setType(list(alpha=93170, beta=31022), "beta pars for probability")
 
 # Non-visualisation proportion
+# SOURCE: MASS
 v2$probOfNonvisualization <- setType(0.0121, "probability")
 v1distributions$probOfNonvisualization <-
 		setType(list(alpha=329, beta=26818), "beta pars for probability")
@@ -55,14 +58,17 @@ v1other$prevalenceThreshold<-3.0
 
 ################################################################################
 # AAA GROWTH & RUPTURE
-## USING GAMMA AND ALPHA ESTIMATES FROM JOINT LONGITUDINAL & RUPTURE MODEL WITH SEX AS A COVARIATE
+## SOURCE FOR GROWTH RATES: MASS
 v2$beta0 <- 1.27152200
 v2$beta1 <- 0.05838810
 v2$sigma0 <- exp(-1.737735221)
 v2$sigma1 <- exp(-3.318297793)
 v2$rho <- tanh(0.455016818)
 v2$sigmaW <- exp(-2.586854985)
-v2$gamma <- -13.843
+
+## SOURCE FOR RUPTURE RATES: 6 RESCAN STUDIES WITH RUPTURE RATES IN BOTH MEN AND WOMEN
+## USING GAMMA AND ALPHA ESTIMATES FROM JOINT LONGITUDINAL & RUPTURE MODEL WITH SEX AS A COVARIATE
+v2$gamma <- -13.843    ## = -12.37-1.473 (intercept - sex effect)
 v2$alpha <- 5.446
 ## x <- seq(3,6,by=0.1)
 ## y <- exp(v2$gamma + v2$alpha*log(x))
@@ -116,11 +122,13 @@ v1other$monitoringIntervals <- c(1, 1, 0.25)
 v1other$maxNumberMonitor <- c(Inf, Inf, Inf)
 
 # Dropout rate from surveillance
+# SOURCE: MASS
 v2$rateOfDropoutFromMonitoring <- setType(0.01430178 * 4, "rate")  # see below
 v1distributions$rateOfDropoutFromMonitoring <- setType(list(
 		shape=330, scale=4*4.34e-5), "gamma pars for rate")
 
 # # Incidental detection rate
+# SOURCE: GLOVER ET AL. CALIBRATED PARAMETER
 v2$rateOfIncidentalDetection <-
 		setType(convertThreeMonthProbToRate(0.0114), "rate")
 v1distributions$rateOfIncidentalDetection <-
@@ -163,7 +171,8 @@ v1other$waitingTimeToElectiveSurgery <- 59 / 365.25
 ################################################################################
 # ELECTIVE OPERATIONS
 
-# Proportion receiving EVAR vs. open repair
+# Proportion receiving Open vs. EVAR 
+# SOURCE: National Vascular Registry 
 me <- c(intercept = -1.044769, age = -0.092481, aortaSize = 0.305962)
 v2$probOfElectiveSurgeryIsOpen <-
  setType(me,
@@ -177,6 +186,7 @@ v1distributions$probOfElectiveSurgeryIsOpen <-
 v1other$electiveSurgeryAaaDeathMethod <- "survivalModel"
 		
 # EVAR 30-day operative mortality
+# SOURCE: National Vascular Registry
 me.evar.mort <- c(intercept = -4.80918, age = 0.09267, aortaSize = 0.28863)
 v2$probOfAaaDeathInInitialPeriodAfterElectiveEvarSurgery <-
  setType(me.evar.mort,
@@ -188,6 +198,7 @@ v1distributions$probOfAaaDeathInInitialPeriodAfterElectiveEvarSurgery <-
           "hyperpars for logistic model for probability")
 
 # Open repair 30-day operative mortality
+# SOURCE: National Vascular Registry
 me.open.mort <- c(intercept = -2.92497, age = 0.08619, aortaSize = 0.11027)
 v2$probOfAaaDeathInInitialPeriodAfterElectiveOpenSurgery <-
   setType(me.open.mort,
@@ -200,7 +211,7 @@ v1distributions$probOfAaaDeathInInitialPeriodAfterElectiveOpenSurgery <-
 
 		
 # Re-intervention rate after successful EVAR
-## TAKEN FROM EVAR-1 TRIAL
+# SOURCE: EVAR-1 TRIAL
 v2$reinterventionRatesAfterElectiveEvar <-
   setType(c(13.5, 3.6) / 100, "reintervention rates")
 v1other$reinterventionTimeBoundariesAfterElectiveEvar <- 120 / 365.25
@@ -208,19 +219,22 @@ v1distributions$reinterventionRatesAfterElectiveEvar <-
   setType(list(shapes=c(18, 153), scales=c(1/134, 1/4213)), "gamma pars for multiple rates")
 
 # Re-intervention rate after successful open repair
+# SOURCE: EVAR-1 TRIAL
 v2$reinterventionRatesAfterElectiveOpen <- 
-  setType(c(2, 53) / 100, "reintervention rates")
+  setType(c(1.6, 1.3) / 100, "reintervention rates")
 v1other$reinterventionTimeBoundariesAfterElectiveOpen <- 120 / 365.25
 v1distributions$reinterventionRatesAfterElectiveOpen <-
  setType(list(shapes=c(2, 53), scales=c(1/122, 1/4016)), "gamma pars for multiple rates")
 
 # Long-term AAA mortality rate after successful EVAR
+# SOURCE: EVAR-1 TRIAL
 v2$rateOfAaaDeathAfterElectiveEvarSurgeryAndInitialPeriod <- 
 		setType(0.0076640849, "rate")
 v1distributions$rateOfAaaDeathAfterElectiveEvarSurgeryAndInitialPeriod <- 
 		setType(list(shape=34, scale=2.254143e-04), "gamma pars for rate")
 
 # Long-term AAA mortality rate after successful open repair
+# SOURCE: EVAR-1 TRIAL
 v2$rateOfAaaDeathAfterElectiveOpenSurgeryAndInitialPeriod <- 
 		setType(0.0006991216, "rate")
 v1distributions$rateOfAaaDeathAfterElectiveOpenSurgeryAndInitialPeriod <- 
@@ -230,11 +244,13 @@ v1distributions$rateOfAaaDeathAfterElectiveOpenSurgeryAndInitialPeriod <-
 # EMERGENCY OPERATIONS
 
 # % operated after rupture
+# SOURCE: MASS
 v2$probOfEmergencySurgeryIfRupture <- setType(0.368, "probability")
 v1distributions$probOfEmergencySurgeryIfRupture <- 
 		setType(list(alpha=193, beta=331), "beta pars for probability")
 		
-# Proportion receiving EVAR vs. open repair
+# Proportion receiving Open vs. EVAR repair
+# SOURCE: NVR
 me.emer <- c(intercept = 1.258285, age = -0.044231)
 v2$probOfEmergencySurgeryIsOpen <- 
   setType(me.emer, 
@@ -250,6 +266,7 @@ v1distributions$probOfEmergencySurgeryIsOpen <-
  v1other$emergencySurgeryAaaDeathMethod <- "survivalModel"
 
 # EVAR 30-day operative mortality
+# SOURCE: NVR
  me.emer.evar <- c(intercept = -1.26631, age = 0.04943)
  v2$probOfAaaDeathInInitialPeriodAfterEmergencyEvarSurgery <-
    setType(me.emer.evar,
@@ -261,6 +278,7 @@ v1distributions$probOfEmergencySurgeryIsOpen <-
            "hyperpars for logistic model for probability")
  
 # Open repair 30-day operative mortality
+# SOURCE: NVR
  me.emer.open <- c(intercept = -0.239289, age = 0.064316)
  v2$probOfAaaDeathInInitialPeriodAfterEmergencyOpenSurgery <-
    setType(me.emer.open,
@@ -273,6 +291,7 @@ v1distributions$probOfEmergencySurgeryIsOpen <-
 
  
 # Re-intervention rate after successful EVAR
+# SOURCE: IMPROVE Trial
  v2$reinterventionRatesAfterEmergencyEvar <-
    setType(10.9 / 100, "reintervention rates")
  v1other$reinterventionTimeBoundariesAfterEmergencyEvar <- numeric()
@@ -280,18 +299,21 @@ v1distributions$probOfEmergencySurgeryIsOpen <-
    setType(list(shape=29, scale=1/267), "gamma pars for rate")
 
 # Re-intervention rate after successful open repair
+# SOURCE: IMPROVE Trial
  v2$reinterventionRatesAfterEmergencyOpen <- setType(6.1 / 100, "reintervention rates")
  v1other$reinterventionTimeBoundariesAfterEmergencyOpen <- numeric()
  v1distributions$reinterventionRatesAfterEmergencyOpen <-
    setType(list(shape=25, scale=1/410), "gamma pars for rate")
 
 # Long-term rate of death after EVAR
+# SOURCE: IMPROVE Trial
  v2$rateOfAaaDeathAfterEmergencyEvarSurgeryAndInitialPeriod <-
    setType(0.985/100, "rate")  
  v1distributions$rateOfAaaDeathAfterEmergencyEvarSurgeryAndInitialPeriod <-
    setType(list(shape=4, scale=1/406), "gamma pars for rate")
  
 # Long-term rate of death after Open
+# SOURCE: IMPROVE Trial
  v2$rateOfAaaDeathAfterEmergencyOpenSurgeryAndInitialPeriod <-
    setType(1.437 / 100, "rate")
  v1distributions$rateOfAaaDeathAfterEmergencyOpenSurgeryAndInitialPeriod <-
@@ -300,22 +322,22 @@ v1distributions$probOfEmergencySurgeryIsOpen <-
 ################################################################################
 # COSTS (SAME AS SWAN MODEL FOR WOMEN)
  v2$costs <- setType(c(
-   inviteToScreen=1.80,
-   requireReinvitation=1.80,
-   screen=34.11,
-   monitor=72.03,
-   monitorFollowingContraindication=72.03,
-   consultation=328.64,
-   electiveSurgeryEvar=13844,
-   electiveSurgeryOpen=13060,
-   emergencySurgeryEvar=16154,
-   emergencySurgeryOpen=17613,
-   reinterventionAfterElectiveEvar=7546,
-   reinterventionAfterElectiveOpen=8986,
-   reinterventionAfterEmergencyEvar=7546,
-   reinterventionAfterEmergencyOpen=8986,
-   monitorFollowingEvarSurgery=258.16,
-   monitorFollowingOpenSurgery=196.79
+   inviteToScreen=1.80,  # SOURCE: NAAASP
+   requireReinvitation=1.80, # SOURCE: NAAASP
+   screen=34.11, # SOURCE: NAAASP
+   monitor=72.03, # SOURCE: NAAASP
+   monitorFollowingContraindication=72.03, # SOURCE: NAAASP
+   consultation=328.64, # SOURCE: NHS Reference Costs
+   electiveSurgeryEvar=12993, # SOURCE: EVAR-1 & HES LOS
+   electiveSurgeryOpen=11712, # SOURCE: EVAR-1 & HES LOS
+   emergencySurgeryEvar=18045, # SOURCE: IMPROVE & HES LOS
+   emergencySurgeryOpen=17995, # SOURCE: IMPROVE & HES LOS
+   reinterventionAfterElectiveEvar=8651, # SOURCE: EVAR-1
+   reinterventionAfterElectiveOpen=11459, # SOURCE: EVAR-1
+   reinterventionAfterEmergencyEvar=8651, # SOURCE: EVAR-1
+   reinterventionAfterEmergencyOpen=11459, # SOURCE: EVAR-1
+   monitorFollowingEvarSurgery=258.16, # SOURCE: NHS Reference Costs
+   monitorFollowingOpenSurgery=196.79 # SOURCE: NHS Reference Costs
  ), type="costs")
 
 v1distributions$costs <- setType(v2$costs, "fixed value for costs")
