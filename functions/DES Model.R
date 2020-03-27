@@ -43,6 +43,7 @@
 ## psa -- Should PSA be conducted (defaults to FALSE)
 ## n -- Number of pairs of individuals to be run in DES (defaults to 10000)
 ## nPSA -- Number of PSA iterations (defaults to 100). Only used if psa = TRUE
+## selectiveSampling -- Use selective sampling to estimate incremental effects? This uses processControlOnly to first get absolute numbers for control group
 ## extraInputs -- A list of any elements of v0, v1other, v1distributions and v2 that the user wishes to change from the R command line
 
 
@@ -67,7 +68,7 @@
 
 ################################################################################
 # AAA_DES
-AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, 
+AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampling = TRUE,
                     extraInputs = list(v0 = list(), v1other = list(), v2 = list(), v1distributions = list())){
   v0 <- compactList() 
   v1distributions <- compactList() 
@@ -361,15 +362,18 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100,
   }
 
   if(psa == FALSE) {
-    ## Run model once using point estimates
-    res<-processPersonsControlOnly(v0, v1other, v2)
-    res.sampled<-processPersonsAboveDiagnosisThreshold(v0, v1other, v2, 
-                                                       threshold=v1other$aortaDiameterThresholds[1])
-    result <- list(resultsControl = res, resultsIncremental = res.sampled)
-    result$meanQuantities <- rbind(res$meanQuantities, difference = NA)
-    result$meanQuantities["screening",] <- res$meanQuantities["noScreening",] + res.sampled$incrementalMeanQuantities
-    result$meanQuantities["difference",] <- res.sampled$incrementalMeanQuantities
-    
+    if(selectiveSampling == TRUE){
+      ## Run model once using point estimates
+      res<-processPersonsControlOnly(v0, v1other, v2)
+      res.sampled<-processPersonsAboveDiagnosisThreshold(v0, v1other, v2, 
+                                                         threshold=v1other$aortaDiameterThresholds[1])
+      result <- list(resultsControl = res, resultsIncremental = res.sampled)
+      result$meanQuantities <- rbind(res$meanQuantities, difference = NA)
+      result$meanQuantities["screening",] <- res$meanQuantities["noScreening",] + res.sampled$incrementalMeanQuantities
+      result$meanQuantities["difference",] <- res.sampled$incrementalMeanQuantities
+    } else {
+      result <- processPersons(v0, v1other, v2)  
+    }
     return(result)
   } else {
     ## Run PSA
@@ -697,9 +701,9 @@ processOnePair <- function(personNumber, v0, v1other, v2) {
 	
 	# Generate boolean variables (v3) for v2 elements of type "probability". 
 	for (elementName in sort(names(v2))) {
-	  ## Making changes here so that Uniform RV is generated for each pair to represent propensity of event occuring
-	  ## Only need to do this for logistic regression events (as these depend on age at event so cannot generate Binomial RV at this stage)
+	  ## Making changes here so that Uniform RV is generated for each pair to represent propensity of each event occuring
 	  ## This reduces MC error in event generation
+
 	  #if (elementName %in% namesOfProbVarsForSurvivalModel) { ## Not sure why this was needed
 	  v2element <- v2[[elementName]]
 	  
@@ -707,6 +711,22 @@ processOnePair <- function(personNumber, v0, v1other, v2) {
 	    v3[[elementName]] <- setType(runif(1), "propensity")
 	    next
 	  } 
+	  
+	  ## Generate propensities for each rate event (e.g. rateOfAaaDeathAfterElectiveEvarSurgeryAndInitialPeriod)
+	  if (getType(v2element) == "rate"){
+	    if(!(elementName %in% c("rateOfIncidentalDetection", "rateOfDropoutFromMonitoring"))){
+	      v3[[elementName]] <- setType(runif(1), "propensity")
+	      next
+	    } else {
+	      ## To allow multiple events to take place in a life-time simulate multiple (e.g. 50 propensities) for events such as incidental detection and dropout
+	      v3[[elementName]] <- setType(runif(50), "propensity")
+	      next
+	    }
+	  }
+	  
+	  if (getType(v2element) == "reintervention rates"){
+	    #browser()
+	  }
 	  
 	  if (getType(v2element) == "probability")
 	    v3[[elementName]] <- setType(rbernoulli(v2element), "boolean")
@@ -877,72 +897,37 @@ processPersonsControlOnly <- function(v0, v1other, v2, updateProgress=NULL) {
   if (v0$method == "serial") {
     # Do it using lapply. 
     setAndShowRandomSeed(v0$randomSeed, verbose=v0$verbose)
+    v0$treatmentGroups <- "noScreening"
     resultForEachPerson <- lapply(X=1:v0$numberOfPersons, 
-                                  FUN=processControlOnly, v0, v1other, v2, updateProgress)
+                                  FUN=processOnePair, v0, v1other, v2)
     
   } else if (v0$method == "parallel") {
     # Do it using parLapply. 
+    v0$treatmentGroups <- "noScreening"
     cluster <- makeCluster(v0$numberOfProcesses)  # previously: outfile=""
     clusterExport(cluster, getAllFunctionsAndStringsInGlobalEnv())
     setAndShowRandomSeed(randomSeed=v0$randomSeed, cluster=cluster, 
                          verbose=v0$verbose)
     resultForEachPerson <- parLapply(cl=cluster, X=1:v0$numberOfPersons,
-                                     fun=processControlOnly, v0, v1other, v2, updateProgress)
+                                     fun=processOnePair, v0, v1other, v2)
     stopCluster(cluster) 
     
   } else if (v0$method == "foreach") {
+    v0$treatmentGroups <- "noScreening"
     if (!is.null(v0$randomSeed)) 
       stop("v0$randomSeed does not yet work with v0$method=\"foreach\"")
     # Do it using foreach and %dopar%. 
     registerDoParallel(cores=v0$numberOfProcesses)
     resultForEachPerson <- foreach(personNumber=1:v0$numberOfPersons,
                                    .export=getAllFunctionsAndStringsInGlobalEnv()) %dopar% {
-                                     processControlOnly(personNumber, v0, v1other, v2, updateProgress) 
+                                     processOnePair(personNumber, v0, v1other, v2) 
                                    }
     stopImplicitCluster()  # (seems unreliable)	
-  } else if (v0$method == "parallelBatches") {
-    # Do it using parLapply and batches. 
-    # This has not been used for some time and might not work! 
-    # Work out the batch sizes:
-    if (!("numberOfBatches" %in% names(v0))) 
-      ## Assign ~1500 persons to each batch
-      v0$numberOfBatches <- max(round(v0$numberOfPersons/1500),1)
-    batchSizes <- calculateBatchSizes(
-      v0$numberOfPersons, v0$numberOfBatches)
-    if (v0$verbose) 
-      cat("numberOfBatches=", v0$numberOfBatches, ", batchSizes=", 
-          paste(head(batchSizes), collapse=" "), "\n", sep="")
-    # Do the parallel computation:
-    cluster <- makeCluster(v0$numberOfProcesses)
-    clusterExport(cluster, getAllFunctionsAndStringsInGlobalEnv())
-    setAndShowRandomSeed(randomSeed=v0$randomSeed, cluster=cluster, 
-                         verbose=v0$verbose)
-    ## Old code which parallelised this part
-    #resultForEachBatch <- parLapply(cl=cluster, X=1:v0$numberOfBatches,
-    #                               fun=processBatchOfPersonsControlOnly, v0, v1other, v2, batchSizes, updateProgress)
-    resultForEachBatch <- lapply(X=1:v0$numberOfBatches,
-                                 FUN=processBatchOfPersonsControlOnly, v0, v1other, v2, batchSizes, updateProgress, cluster)
-    # The Xth task is for processBatchOfPersons to analyze a batch of 
-    # batchSizes[X] persons. 
-    stopCluster(cluster)
-    # Copy everything into resultForEachPerson:
-    resultForEachPerson <- vector("list", v0$numberOfPersons)
-    i <- 1
-    timeSpentCopyingFromBatches <- system.time(
-      for (j in seq_along(resultForEachBatch)) { 
-        for (k in seq_along(resultForEachBatch[[j]])) {
-          # Copy person number k in batch number j:
-          resultForEachPerson[[i]] <- resultForEachBatch[[j]][[k]]
-          i <- i + 1
-        }
-      }
-    )["elapsed"]
-    if (v0$verbose)
-      cat("Time spent copying resultForEachBatch to resultForEach", 
-          "Person: ", timeSpentCopyingFromBatches, " seconds\n", sep="")
   }  else {
     stop("v0$method=", v0$method, " is illegal")
   }
+  ## REMOVED PROCESS BATCH OF PERSONS
+  
   # TODO: if returnMeanQuantities=TRUE and the other two are FALSE, it might 
   # be better to put the mean quantities in a three-dimensional array straight
   # away, i.e. use parSapply(..., simplify="array") instead of parLapply. 
@@ -983,18 +968,18 @@ processPersonsControlOnly <- function(v0, v1other, v2, updateProgress=NULL) {
 # The idea of this function is that it might make the parallel computation 
 # faster. 
 
-processBatchOfPersonsControlOnly <- function(
-  batchNumber, v0, v1other, v2, batchSizes, updateProgress, cluster) {
-  # If we were passed a progress update function, call it
-  if (is.function(updateProgress)) {
-    text <- "\n Calculating absolute event numbers in not invited group"
-    num <-batchNumber/(length(batchSizes))
-    updateProgress(value=num,detail = text)
-  }
-  numberOfPersonsInThisBatch <- batchSizes[batchNumber]
-  parLapply(cl=cluster, X=1:numberOfPersonsInThisBatch, fun=processControlOnly, 
-            v0, v1other, v2,updateProgress=NULL)
-}
+# processBatchOfPersonsControlOnly <- function(
+#   batchNumber, v0, v1other, v2, batchSizes, updateProgress, cluster) {
+#   # If we were passed a progress update function, call it
+#   if (is.function(updateProgress)) {
+#     text <- "\n Calculating absolute event numbers in not invited group"
+#     num <-batchNumber/(length(batchSizes))
+#     updateProgress(value=num,detail = text)
+#   }
+#   numberOfPersonsInThisBatch <- batchSizes[batchNumber]
+#   parLapply(cl=cluster, X=1:numberOfPersonsInThisBatch, fun=processControlOnly, 
+#             v0, v1other, v2,updateProgress=NULL)
+# }
 
 ################################################################################
 ################################################################################
@@ -1002,134 +987,134 @@ processBatchOfPersonsControlOnly <- function(
 # used in Shiny app to get events for control group only
 # events for intervention group will be obtained from the differences
 
-processControlOnly <- function(personNumber, v0, v1other, v2, updateProgress) {
-  # personNumber is not used (except if showEventHistories). It is just 
-  # needed because lapply and parLapply force you to pass the number into 
-  # the function that they call. 
-  
-  # If we were passed a progress update function, call it
-  if (is.function(updateProgress)) {
-    text <- "Calculating absolute event numbers in not invited group"
-    num <-personNumber/(2*v0$numberOfPersons)
-    updateProgress(value=num,detail = text)
-  }
-  
-  
-  # Check things. 
-  if (!("namesOfQuantities" %in% names(v0)))
-    stop("processOnePair needs v0$namesOfQuantities to exist;",
-         "\nthis is normally done by processPersons or psa")
-  if (v1other$nonAaaDeathMethod %in% c("mass", "onsIntegerStart") && 
-      !("nonAaaSurvProbs" %in% names(v1other)))
-    stop("when v1other$nonAaaDeathMethod is \"", v1other$nonAaaDeathMethod, "\", ",
-         "processOnePair needs \nv1other$nonAaaSurvProbs ",
-         "to exist; this is normally done by processPersons")
-  if (v1other$nonAaaDeathMethod == "onsNonintegerStart" &&
-      !("nonAaaMortalityRates" %in% names(v1other)))
-    stop("when v1other$nonAaaDeathMethod is , \"onsNonintegerStart\", ",
-         "processOnePair needs \nv1other$nonAaaMortalityRates ",
-         "to exist; this is normally done by processPersons")
-  
-  # Make result, which will be returned from this function. 
-  result <- list(personQuantities=
-                   sapply(v0$treatmentGroups, function(x) NULL)) 
-  if (v0$returnEventHistories) result$eventHistories <- 
-    sapply(v0$treatmentGroups, function(x) NULL)
-  
-  # Generate this person's characteristics and natural events. 
-  aortaGrowthParameters <- generatePersonAortaParameters(v1other, v2)
-  v3 <- compactList(
-    # Characteristics:
-    b0=aortaGrowthParameters$b0, 
-    b1=aortaGrowthParameters$b1,
-    # Natural events:
-    ruptureTime=aortaGrowthParameters$ruptureTime,
-    nonAaaDeathTime=generateTimeTillNonAaaDeath(v0, v1other),
-    
-    # Initial diameter as measured (this is "y0" in 
-    # generatePersonAortaParameters and is only used if they attend 
-    # screening and do not have non-visualization):
-    initialAortaSizeAsMeasured=
-      aortaGrowthParameters$initialAortaSizeAsMeasured
-  )
-  
-  
-  
-  # Generate this person's boolean variables such as requireReinvitation and 
-  # decideOnElectiveSurgery. Go through the elements of v2 and for those that 
-  # have type "probability", generate a boolean element of v3. (If it has 
-  # type "logistic model for probability" then deal with it elsewhere. 
-  ## Making changes here so that Uniform RV is generated for each pair to represent propensity of event occuring
-  ## Only need to do this for logistic regression events (as these depend on age at event so cannot generate Binomial RV at this stage)
-  ## This reduces MC error in event generation
-  #if (elementName %in% namesOfProbVarsForSurvivalModel) { ## Not sure why this was needed
-  
-  for (elementName in sort(names(v2))) {
-    v2element <- v2[[elementName]]
-    if (getType(v2element) == "logistic model for probability") {
-      v3[[elementName]] <- setType(runif(1), "propensity")
-      next
-    }
-    
-    if (getType(v2element) == "probability")
-      v3[[elementName]] <- setType(rbernoulli(v2element), "boolean")
-  }
-  
-  # Generate this person's censoring-time, if v0$generateCensoringTime exists.
-  if ("generateCensoringTime" %in% names(v0)) {
-    v3$censoringTime <- v0$generateCensoringTime()
-  }
-  
-  # Put the person through the different treatments. 
-  for (treatmentGroup in "noScreening") {
-    
-    # Create this person's full list of events. Record everything that will
-    # be necessary for calculating this person's costs, QALYs, etc. The 
-    # possible event-types can be got from the big flowchart for the 
-    # previous model. (Previously, generateEventHistory's last argument was 
-    # v4 = list(treatmentGroup=treatmentGroup), but that was pointless.) 
-    eventHistory <- 
-      generateEventHistory(v0, v1other, v2, v3, treatmentGroup)
-    
-    # If showEventHistories, then display the person's event-history.
-    # This was mostly for the early stages of development or debugging.
-    # If you want to show their age at baseline as well, change the line 
-    # "nonAaaDeathTime=...". At present, initial age is not stored. 
-    if (v0$showEventHistories) {
-      varNames <- c("personNumber", "treatmentGroup", "v3$b0", 
-                    "v3$b1", "v3$ruptureTime", "v3$nonAaaDeathTime")
-      for (varName in varNames) {
-        var <- getAnything(varName)
-        if (varName != "personNumber" && is.numeric(var)) 
-          var <- sprintf("%.2f", var)
-        cat(varName, "=", var, "  ", sep="")
-        #if (k %% 4 == 0 && k < length(varNames)) cat("\n")	
-      }
-      cat("\n")
-      print(eventHistory)
-      cat("\n")
-    }
-    
-    # If returnEventHistories, then store the event-history. 
-    if (v0$returnEventHistories) 
-      result$eventHistories[[treatmentGroup]] <- eventHistory	
-    # MS added. Store individual's b0 and b1 so that aorta size of the population can be assessed at later ages
-    result$eventHistories[[treatmentGroup]]$b0 <- v3$b0
-    result$eventHistories[[treatmentGroup]]$b1 <- v3$b1
-    result$eventHistories[[treatmentGroup]]$initialAortaSizeAsMeasured <- v3$initialAortaSizeAsMeasured
-    # From eventHistory (and nothing else that is specific to the person),
-    # calculate their life-years, QALYs, 
-    # total cost, etc., and store these in outputs. The health-economic
-    # quantities have to be calculated here, when you definitely have all 
-    # the event-times to hand (in eventHistory), because the discounting 
-    # calculations require all the specific event-times. 
-    result$personQuantities[[treatmentGroup]] <- 
-      calculateHealthEconomicQuantities(
-        eventHistory, v0$namesOfQuantities, v2$costs, v1other)
-  }
-  
-  return(result)
-}
+# processControlOnly <- function(personNumber, v0, v1other, v2, updateProgress) {
+#   # personNumber is not used (except if showEventHistories). It is just 
+#   # needed because lapply and parLapply force you to pass the number into 
+#   # the function that they call. 
+#   
+#   # If we were passed a progress update function, call it
+#   if (is.function(updateProgress)) {
+#     text <- "Calculating absolute event numbers in not invited group"
+#     num <-personNumber/(2*v0$numberOfPersons)
+#     updateProgress(value=num,detail = text)
+#   }
+#   
+#   
+#   # Check things. 
+#   if (!("namesOfQuantities" %in% names(v0)))
+#     stop("processOnePair needs v0$namesOfQuantities to exist;",
+#          "\nthis is normally done by processPersons or psa")
+#   if (v1other$nonAaaDeathMethod %in% c("mass", "onsIntegerStart") && 
+#       !("nonAaaSurvProbs" %in% names(v1other)))
+#     stop("when v1other$nonAaaDeathMethod is \"", v1other$nonAaaDeathMethod, "\", ",
+#          "processOnePair needs \nv1other$nonAaaSurvProbs ",
+#          "to exist; this is normally done by processPersons")
+#   if (v1other$nonAaaDeathMethod == "onsNonintegerStart" &&
+#       !("nonAaaMortalityRates" %in% names(v1other)))
+#     stop("when v1other$nonAaaDeathMethod is , \"onsNonintegerStart\", ",
+#          "processOnePair needs \nv1other$nonAaaMortalityRates ",
+#          "to exist; this is normally done by processPersons")
+#   
+#   # Make result, which will be returned from this function. 
+#   result <- list(personQuantities=
+#                    sapply(v0$treatmentGroups, function(x) NULL)) 
+#   if (v0$returnEventHistories) result$eventHistories <- 
+#     sapply(v0$treatmentGroups, function(x) NULL)
+#   
+#   # Generate this person's characteristics and natural events. 
+#   aortaGrowthParameters <- generatePersonAortaParameters(v1other, v2)
+#   v3 <- compactList(
+#     # Characteristics:
+#     b0=aortaGrowthParameters$b0, 
+#     b1=aortaGrowthParameters$b1,
+#     # Natural events:
+#     ruptureTime=aortaGrowthParameters$ruptureTime,
+#     nonAaaDeathTime=generateTimeTillNonAaaDeath(v0, v1other),
+#     
+#     # Initial diameter as measured (this is "y0" in 
+#     # generatePersonAortaParameters and is only used if they attend 
+#     # screening and do not have non-visualization):
+#     initialAortaSizeAsMeasured=
+#       aortaGrowthParameters$initialAortaSizeAsMeasured
+#   )
+#   
+#   
+#   
+#   # Generate this person's boolean variables such as requireReinvitation and 
+#   # decideOnElectiveSurgery. Go through the elements of v2 and for those that 
+#   # have type "probability", generate a boolean element of v3. (If it has 
+#   # type "logistic model for probability" then deal with it elsewhere. 
+#   ## Making changes here so that Uniform RV is generated for each pair to represent propensity of event occuring
+#   ## Only need to do this for logistic regression events (as these depend on age at event so cannot generate Binomial RV at this stage)
+#   ## This reduces MC error in event generation
+#   #if (elementName %in% namesOfProbVarsForSurvivalModel) { ## Not sure why this was needed
+#   
+#   for (elementName in sort(names(v2))) {
+#     v2element <- v2[[elementName]]
+#     if (getType(v2element) == "logistic model for probability") {
+#       v3[[elementName]] <- setType(runif(1), "propensity")
+#       next
+#     }
+#     
+#     if (getType(v2element) == "probability")
+#       v3[[elementName]] <- setType(rbernoulli(v2element), "boolean")
+#   }
+#   
+#   # Generate this person's censoring-time, if v0$generateCensoringTime exists.
+#   if ("generateCensoringTime" %in% names(v0)) {
+#     v3$censoringTime <- v0$generateCensoringTime()
+#   }
+#   
+#   # Put the person through the different treatments. 
+#   for (treatmentGroup in "noScreening") {
+#     
+#     # Create this person's full list of events. Record everything that will
+#     # be necessary for calculating this person's costs, QALYs, etc. The 
+#     # possible event-types can be got from the big flowchart for the 
+#     # previous model. (Previously, generateEventHistory's last argument was 
+#     # v4 = list(treatmentGroup=treatmentGroup), but that was pointless.) 
+#     eventHistory <- 
+#       generateEventHistory(v0, v1other, v2, v3, treatmentGroup)
+#     
+#     # If showEventHistories, then display the person's event-history.
+#     # This was mostly for the early stages of development or debugging.
+#     # If you want to show their age at baseline as well, change the line 
+#     # "nonAaaDeathTime=...". At present, initial age is not stored. 
+#     if (v0$showEventHistories) {
+#       varNames <- c("personNumber", "treatmentGroup", "v3$b0", 
+#                     "v3$b1", "v3$ruptureTime", "v3$nonAaaDeathTime")
+#       for (varName in varNames) {
+#         var <- getAnything(varName)
+#         if (varName != "personNumber" && is.numeric(var)) 
+#           var <- sprintf("%.2f", var)
+#         cat(varName, "=", var, "  ", sep="")
+#         #if (k %% 4 == 0 && k < length(varNames)) cat("\n")	
+#       }
+#       cat("\n")
+#       print(eventHistory)
+#       cat("\n")
+#     }
+#     
+#     # If returnEventHistories, then store the event-history. 
+#     if (v0$returnEventHistories) 
+#       result$eventHistories[[treatmentGroup]] <- eventHistory	
+#     # MS added. Store individual's b0 and b1 so that aorta size of the population can be assessed at later ages
+#     result$eventHistories[[treatmentGroup]]$b0 <- v3$b0
+#     result$eventHistories[[treatmentGroup]]$b1 <- v3$b1
+#     result$eventHistories[[treatmentGroup]]$initialAortaSizeAsMeasured <- v3$initialAortaSizeAsMeasured
+#     # From eventHistory (and nothing else that is specific to the person),
+#     # calculate their life-years, QALYs, 
+#     # total cost, etc., and store these in outputs. The health-economic
+#     # quantities have to be calculated here, when you definitely have all 
+#     # the event-times to hand (in eventHistory), because the discounting 
+#     # calculations require all the specific event-times. 
+#     result$personQuantities[[treatmentGroup]] <- 
+#       calculateHealthEconomicQuantities(
+#         eventHistory, v0$namesOfQuantities, v2$costs, v1other)
+#   }
+#   
+#   return(result)
+# }
 
 ################################################################################
 
@@ -1240,35 +1225,48 @@ getExactInitialAortaSize <- function(b0, b1) {
 getTimeAtGivenDiameter <- function(v3, diameter) {
 	(log(diameter) - v3$b0) / v3$b1
 }
+
+
 # Generate time until incidental detection, given that the person is aneurysmal:
-randomTime <- function(rateOfIncidentalDetection) {
-	rexp(n=1, rate=rateOfIncidentalDetection)
-}
+# timeIncidentalDetection <- function(v3, rateOfIncidentalDetection) {
+#   time <- qexp(v3[["rateOfIncidentalDetection"]][1], rate = rateOfIncidentalDetection)
+#   v3[["rateOfIncidentalDetection"]] <- v3[["rateOfIncidentalDetection"]][-1]
+#   ## Now uses propensity generated for pair of individuals         
+# ## rexp(n=1, rate=rateOfIncidentalDetection)
+#   return(list(time = time, v3 = v3))
+# }
 
 # generateIncidentalDetectionTime. This assumes the linear model for log-diameter for each person. 
 generateIncidentalDetectionTime <- function(currentTime, 
 		thresholdForIncidentalDetection, v3, rateOfIncidentalDetection) {
 	# If v1other$zeroGrowthDiameterThreshold is used, b1 might be exactly zero:
-	if (v3$b1 == 0) return(NA)  
+	if (v3$b1 == 0) return(list(time = NA, v3 = v3))  
 	# Otherwise
 	timeAtThreshold <- 
 			getTimeAtGivenDiameter(v3, thresholdForIncidentalDetection)
 	# There are four possibilities:
 	if (timeAtThreshold <= currentTime && v3$b1 <= 0) 
-		return(NA)
-	if (timeAtThreshold <= currentTime && v3$b1 > 0) 
-		return(currentTime + randomTime(rateOfIncidentalDetection))
+		return(list(time = NA, v3 = v3))
+	if (timeAtThreshold <= currentTime && v3$b1 > 0){ 
+	  ## Inverse of the survival function (quantile function)
+	  incidentalDetectionTime <- qexp(v3[["rateOfIncidentalDetection"]][1], rate = rateOfIncidentalDetection)
+	  v3[["rateOfIncidentalDetection"]] <- v3[["rateOfIncidentalDetection"]][-1]
+		return(list(time = currentTime + incidentalDetectionTime, v3 = v3))
+	}
 	if (timeAtThreshold > currentTime && v3$b1 <= 0) {
-		incidentalDetectionTime <- 
-				currentTime + randomTime(rateOfIncidentalDetection)
-		if (incidentalDetectionTime < timeAtThreshold) {
-			return(incidentalDetectionTime)
+	  incidentalDetectionTime <- currentTime + qexp(v3[["rateOfIncidentalDetection"]][1], rate = rateOfIncidentalDetection)
+	  v3[["rateOfIncidentalDetection"]] <- v3[["rateOfIncidentalDetection"]][-1]
+	  if (incidentalDetectionTime < timeAtThreshold) {
+			return(list(time = incidentalDetectionTime, v3 = v3))
 		} else {
-			return(NA)
+			return(list(time = NA, v3 = v3))
 		}
 	}
-	if (timeAtThreshold > currentTime && v3$b1 > 0) 
-		return(timeAtThreshold + randomTime(rateOfIncidentalDetection))
+	if (timeAtThreshold > currentTime && v3$b1 > 0){ 
+	  incidentalDetectionTime <- qexp(v3[["rateOfIncidentalDetection"]][1], rate = rateOfIncidentalDetection)
+	  v3[["rateOfIncidentalDetection"]] <- v3[["rateOfIncidentalDetection"]][-1]
+	  return(list(time = timeAtThreshold + incidentalDetectionTime, v3 = v3))
+	}
 }
 
 # Adjust the prevalence in a baseline diameter distribution. 
@@ -1370,13 +1368,15 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 	scheduledEvents["nonAaaDeath"] <- v3$nonAaaDeathTime
 	if (treatmentGroup=="screening") 
 		scheduledEvents["inviteToScreen"] <- 0
-	if (treatmentGroup=="noScreening")
-		scheduledEvents["incidentalDetection"] <- 
-				generateIncidentalDetectionTime(0, 
-				v1other$thresholdForIncidentalDetection, v3, 
-				v2$rateOfIncidentalDetection)
+	if (treatmentGroup=="noScreening"){
+	  gID <- generateIncidentalDetectionTime(0, 
+	                                  v1other$thresholdForIncidentalDetection, v3, 
+	                                  v2$rateOfIncidentalDetection)
+	  scheduledEvents["incidentalDetection"] <- gID$time
+	  v3 <- gID$v3
+	}
 	if ("censoringTime" %in% names(v3))
-		scheduledEvents["censored"] <- v3$censoringTime
+	  scheduledEvents["censored"] <- v3$censoringTime
 	
 	## Set numberMonitor = number of times in each size group that monitoring has occurred. Include large AAA group here as well
 	numberMonitor <- rep(0,length(v1other$aortaDiameterThresholds)+1)
@@ -1407,10 +1407,11 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 				scheduledEvents["screen"] <- 0   # ("screen" means they attend)
 			} else {
 				eventHistory <- addEvent(eventHistory, "failToAttendScreen", 0)
-				scheduledEvents["incidentalDetection"] <- 
-						generateIncidentalDetectionTime(
-						eventTime, v1other$thresholdForIncidentalDetection, v3, 
-						v2$rateOfIncidentalDetection)
+				gID <- generateIncidentalDetectionTime(eventTime, 
+				                                       v1other$thresholdForIncidentalDetection, v3, 
+				                                       v2$rateOfIncidentalDetection)
+				scheduledEvents["incidentalDetection"] <- gID$time
+				v3 <- gID$v3
 			}
 		
 		} else if (eventType=="screen") {
@@ -1435,10 +1436,11 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			numberMonitor[aortaSizeGroup + 1] <- numberMonitor[aortaSizeGroup + 1] + 1
 			
 			if (aortaSizeGroup == 0 || v3$probOfNonvisualization) {  ## Assumes that first group is screened normal group
-				scheduledEvents["incidentalDetection"] <- 
-						generateIncidentalDetectionTime(
-						eventTime, v1other$thresholdForIncidentalDetection, v3, 
-						v2$rateOfIncidentalDetection)
+			  gID <- generateIncidentalDetectionTime(eventTime, 
+			                                         v1other$thresholdForIncidentalDetection, v3, 
+			                                         v2$rateOfIncidentalDetection)
+			  scheduledEvents["incidentalDetection"] <- gID$time
+			  v3 <- gID$v3
 			} else if (aortaSizeGroup < length(v1other$aortaDiameterThresholds)) {
 			  scheduledEvents["monitor"] <- 
 						eventTime + v1other$monitoringIntervals[aortaSizeGroup+1] ## Updated MS. 07/02/19
@@ -1696,12 +1698,11 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			scheduledEvents["monitor"] <- NA
 			## Reset numberMonitor to zero so that if they get incidentally detected they start afresh
 			numberMonitor <- rep(0,length(v1other$aortaDiameterThresholds)+1)
-			
-			scheduledEvents["incidentalDetection"] <- 
-					generateIncidentalDetectionTime(
-					eventTime, v1other$thresholdForIncidentalDetection, v3, 
-					v2$rateOfIncidentalDetection)
-	
+			gID <- generateIncidentalDetectionTime(eventTime, 
+			                                       v1other$thresholdForIncidentalDetection, v3, 
+			                                       v2$rateOfIncidentalDetection)
+			scheduledEvents["incidentalDetection"] <- gID$time
+			v3 <- gID$v3
 		} else if (eventType %in% c(
 				"reinterventionAfterElectiveOpen", 
 				"reinterventionAfterElectiveEvar", 
@@ -1864,8 +1865,10 @@ generatePostSurgeryAaaDeathTime <- function(v1other, v2, v3, eventTime,
 	#if (rbernoulli(v2[[probVarName]])) {
 		return(0)
 	} else {
-		return(v1other$postSurgeryInitialPeriod + 
-				rexp(n=1, rate=v2[[rateVarName]]))
+	  return(v1other$postSurgeryInitialPeriod + 
+	           qexp(v3[[rateVarName]], rate = v2[[rateVarName]]))
+	  ## Now uses propensity generated for pair of individuals         
+	  #rexp(n=1, rate=v2[[rateVarName]]))
 	}
 	
 }

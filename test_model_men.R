@@ -31,17 +31,28 @@ targetGroup <- data.frame(sex="Male", age=65, smoker=1)
 
 dataFile <- "input/DES_Data_Input_Men30years.xlsx"
 
-# v0$numberOfPersons <- 4000
-# result <- processPersons(v0, v1other, v2)
-# result$meanQuantities
+v0$numberOfPersons <- 4000
+result <- processPersons(v0, v1other, v2)
+result$meanQuantities
+# quantity
+# treatmentGroup lifeYears    qalys     cost discountedLifeYears discountedQalys
+# noScreening  18.22035 13.94150 235.6870            12.68500        9.744767
+# screening    18.22264 13.94324 262.3345            12.68656        9.745949
+# quantity
+# treatmentGroup discountedCost
+# noScreening       139.1564
+# screening         170.0720
 
-result <- AAA_DES(dataFile, n = 4000, extraInputs = list(v0 = v0, v1other = v1other, v1distributions = v1distributions, v2 = v2))
+result <- AAA_DES(dataFile, n = 4000, extraInputs = list(v0 = v0, v1other = v1other, v1distributions = v1distributions, v2 = v2,
+                                                         selectiveSampling = F))
 result$meanQuantities
 # N = 4000
 # lifeYears       qalys      cost discountedLifeYears discountedQalys discountedCost
 # noScreening 18.14576160 13.88413069 245.36191        12.637835922     9.708223819      155.63590
 # screening   18.16096737 13.89562268 293.69314        12.646751449     9.714977453      203.89045
 # difference   0.01520578  0.01149199  48.33123         0.008915527     0.006753634       48.25456
+
+
 
 ## Checking PSA
 psaResult <- AAA_DES(dataFile, psa = TRUE, n = 1000, nPSA = 5, extraInputs = list(v0 = v0, v1other = v1other, v1distributions = v1distributions, v2 = v2))
