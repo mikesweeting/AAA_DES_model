@@ -164,7 +164,7 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
 
   ## Assign QoL utilities
   # Overall QoL / utilities
-  v1other <- compactList(append(v1other, createQalyFactors(
+  v2 <- compactList(append(v2, createQalyFactors(
     startAge=v1other$startAge,
     qalyFactorBoundariesAsAges = qalyFactorBoundariesAsAges,
     qalyFactorsForAges = qalyFactorsForAges
@@ -329,7 +329,7 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
     v2$prevalence <- NULL
     v1distributions$prevalence <- NULL
   }
-  
+
   # print(v0)
   # print(v1other)
   # print(v2)
@@ -368,7 +368,7 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
       res.sampled<-processPersonsAboveDiagnosisThreshold(v0, v1other, v2, 
                                                          threshold=v1other$aortaDiameterThresholds[1])
       result <- list(resultsControl = res, resultsIncremental = res.sampled)
-      result$meanQuantities <- rbind(res$meanQuantities, difference = NA)
+      result$meanQuantities <- rbind(res$meanQuantities, screening = NA, difference = NA)
       result$meanQuantities["screening",] <- res$meanQuantities["noScreening",] + res.sampled$incrementalMeanQuantities
       result$meanQuantities["difference",] <- res.sampled$incrementalMeanQuantities
     } else {
@@ -497,7 +497,7 @@ processPersons <- function(v0, v1other, v2) {
 			lapply(X=1:v0$numberOfPersons, FUN=function(x) list())
 	if (v0$returnAllPersonsQuantities) result$allPersonsQuantities <- 
 			lapply(X=1:v0$numberOfPersons, FUN=function(x) list())
-	
+
 	# Create and analyze the persons. Pass all variables to processOnePair
 	if (v0$method == "serial") {
 		setAndShowRandomSeed(v0$randomSeed, verbose=v0$verbose)
@@ -696,7 +696,11 @@ processOnePair <- function(personNumber, v0, v1other, v2) {
 
 		# Initial diameter as measured:
 		initialAortaSizeAsMeasured=
-		aortaGrowthParameters$initialAortaSizeAsMeasured
+		aortaGrowthParameters$initialAortaSizeAsMeasured,
+		
+		# A large vector of propensities (probabilities) to be used each time an observed AAA size is required
+		# This reduces MC error when comparing the two treatment groups (pairs are more closely cloned)
+		aortaSize = setType(runif(300), "propensity")
 	)
 	
 	# Generate boolean variables (v3) for v2 elements of type "probability". 
@@ -725,7 +729,11 @@ processOnePair <- function(personNumber, v0, v1other, v2) {
 	  }
 	  
 	  if (getType(v2element) == "reintervention rates"){
-	    #browser()
+	    ## Only set propensities for reintervention rates once, as only one of the following can occur
+	    ## ElectiveEvar, ElectiveOpen, EmergencyEvar, EmergencyOpen
+	    if(is.null(v3[["reintervention rates"]])){
+	      v3[["rateOfReintervention"]] <- setType(runif(50), "propensity")
+	    }
 	  }
 	  
 	  if (getType(v2element) == "probability")
@@ -769,7 +777,7 @@ processOnePair <- function(personNumber, v0, v1other, v2) {
 		# From eventHistory, calculate the health-economic quantities.
 		result$personQuantities[[treatmentGroup]] <- 
 				calculateHealthEconomicQuantities(
-				eventHistory, v0$namesOfQuantities, v2$costs, v1other)
+				eventHistory, v0$namesOfQuantities, v2$costs, v1other, v2)
 	}
 	
 	return(result)
@@ -1190,7 +1198,7 @@ generatePersonAortaParameters <- function(v1other, v2) {  # (person not persons)
 # deviation (e.g. v2$ultrasoundMeasurementErrorSD, ctMeasurementErrorSD) and 
 # v1distributions$extraDiameterForCtScan. 
 getAortaMeasurement <- function(v3, time, measurementErrorSD, 
-		method=c("ultrasound", "ct", "exact"), extraDiameterForCtScan) {
+		method=c("ultrasound", "ct", "exact"), extraDiameterForCtScan, propensity=NULL) {
 	method <- match.arg(method) 
 	if (xor(method=="ct", !missing(extraDiameterForCtScan)))
 		stop("extraDiameterForCtScan must be given iff method=\"ct\"")
@@ -1198,11 +1206,11 @@ getAortaMeasurement <- function(v3, time, measurementErrorSD,
 		stop("measurementErrorSD must not be given if method=\"exact\"")
 
 	if (method=="ultrasound") {
-		return(getExactAortaMeasurement(v3, time) *
-				exp(rnorm(n=1, sd=measurementErrorSD)))
+	  return(getExactAortaMeasurement(v3, time) *
+				exp(qnorm(propensity, sd=measurementErrorSD)))
 	} else if (method=="ct") {
-		return(getExactAortaMeasurement(v3, time) +
-				rnorm(n=1, sd=measurementErrorSD) +
+	  return(getExactAortaMeasurement(v3, time) +
+				qnorm(propensity, sd=measurementErrorSD) +
 				extraDiameterForCtScan)
 	} else { 
 		return(getExactAortaMeasurement(v3, time))
@@ -1444,17 +1452,20 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			} else if (aortaSizeGroup < length(v1other$aortaDiameterThresholds)) {
 			  scheduledEvents["monitor"] <- 
 						eventTime + v1other$monitoringIntervals[aortaSizeGroup+1] ## Updated MS. 07/02/19
-				scheduledEvents["dropout"] <- generateDropoutTime( 
-						v2$rateOfDropoutFromMonitoring, eventTime)
+			  gD <- generateDropoutTime(eventTime, 
+                    v2$rateOfDropoutFromMonitoring, v3)
+			  scheduledEvents["dropout"] <- gD$time
+			  v3 <- gD$v3
 			} else {
 				scheduledEvents["consultation"] <- 
 						eventTime + v1other$waitingTimeToConsultation
 			}
 			
 		} else if (eventType=="monitor") {
-			# Assume non-visualization never happens in monitoring. 
+		  # Assume non-visualization never happens in monitoring. 
 			aortaSize <- getAortaMeasurement(v3, eventTime, 
-					v2$ultrasoundMeasurementErrorSD, method="ultrasound")
+					v2$ultrasoundMeasurementErrorSD, method="ultrasound", propensity=v3[["aortaSize"]][1])
+			v3[["aortaSize"]] <- v3[["aortaSize"]][-1]
 			if ("trueSizes" %in% names(eventHistory)) {
 				trueSize <- getAortaMeasurement(v3, eventTime, method="exact")
 				eventHistory <- recordSize(eventHistory, trueSize, aortaSize)
@@ -1486,10 +1497,11 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 		} else if (eventType=="consultation") {
 			# Measure the aorta diameter using CT, and if the result is less
 			# than thresholdForSurgery then return to monitoring.  
-			aortaSize <- getAortaMeasurement(v3, eventTime, 
+		  aortaSize <- getAortaMeasurement(v3, eventTime, 
 					v2$ctMeasurementErrorSD, method="ct", 
 					extraDiameterForCtScan=
-					v2$extraDiameterForCtScan)
+					v2$extraDiameterForCtScan, propensity=v3[["aortaSize"]][1])
+		  v3[["aortaSize"]] <- v3[["aortaSize"]][-1]
 			# Record the size.
 			if ("trueSizes" %in% names(eventHistory)) {
 				trueSize <- getAortaMeasurement(v3,eventTime,method="exact")
@@ -1497,23 +1509,26 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			}
 			aortaSizeGroup <- findInterval(aortaSize, 
 					v1other$aortaDiameterThresholds)
-			contraindication <- getBinaryVariable("probOfContraindication", v1other, v2, v3, eventTime)
+			gBV <- getBinaryVariable("probOfContraindication", v1other, v2, v3, eventTime)
+			contraindication <- gBV$result
+			v3 <- gBV$v3
 			
 			if (aortaSizeGroup < length(v1other$aortaDiameterThresholds)) {
 				eventHistory <- addEvent(eventHistory, 
 						"decideOnReturnToMonitoring", eventTime)
 				scheduledEvents["monitor"] <- 
 						eventTime + v1other$monitoringIntervals[aortaSizeGroup + 1] ## updated MS 07/02/19
-				scheduledEvents["dropout"] <- generateDropoutTime( 
-						v2$rateOfDropoutFromMonitoring, eventTime) 
-
+				gD <- generateDropoutTime(eventTime, 
+				                          v2$rateOfDropoutFromMonitoring, v3) 
+				scheduledEvents["dropout"] <- gD$time
+				v3 <- gD$v3
 			} else if (contraindication) {
 				eventHistory <- addEvent(eventHistory, 
 						"contraindicated", eventTime)
 				if(!is.null(v2$rateOfNonAaaDeathAfterContraindication)){
 				  scheduledEvents["nonAaaDeath"] <- eventTime + 
 				    generateTimeToNonAaaDeathFromContraindication(
-				      v2$rateOfNonAaaDeathAfterContraindication)  
+				      v2$rateOfNonAaaDeathAfterContraindication, v3)  
 				}
 				
 		
@@ -1527,8 +1542,10 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			} else {  
 				eventHistory <- addEvent(eventHistory, 
 						"decideOnElectiveSurgery", eventTime)
-				electiveSurgeryIsOpen <- getBinaryVariable(
-						"probOfElectiveSurgeryIsOpen", v1other, v2, v3, eventTime)
+				gBV <- getBinaryVariable(
+				  "probOfElectiveSurgeryIsOpen", v1other, v2, v3, eventTime)
+				electiveSurgeryIsOpen <- gBV$result
+				v3 <- gBV$v3
 				surgeryEvent <- if (electiveSurgeryIsOpen) {
 					"electiveSurgeryOpen" } else { "electiveSurgeryEvar" }
 				scheduledEvents[surgeryEvent] <- 
@@ -1559,9 +1576,11 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 				}
 
 			} else if (v1other$electiveSurgeryAaaDeathMethod == "survivalModel") { 
-				scheduledEvents["aaaDeath"] <- eventTime + 
-						generatePostSurgeryAaaDeathTime(v1other, v2, v3, 
-						eventTime, surgeryType, "elective")
+			  gPS <- generatePostSurgeryAaaDeathTime(v1other, v2, v3, 
+			                                  eventTime, surgeryType, "elective")
+			  v3 <- gPS$v3
+				scheduledEvents["aaaDeath"] <- eventTime + gPS$time
+						
 				if (is.na(scheduledEvents["aaaDeath"]))
 					stop("generatePostSurgeryAaaDeathTime returned NA")
 			} else {
@@ -1585,12 +1604,14 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			} else {
 				stop("eventType is illegal")
 			}
-			scheduledEvents[reinterventionEventType] <- 
-					generateReinterventionTime(
-					rates=reinterventionRates, 
-					timeBoundaries=reinterventionTimeBoundaries,
-					surgeryTime=surgeryTime, currentTime=eventTime, 
-					postSurgeryInitialPeriod=v1other$postSurgeryInitialPeriod)
+			gR <- generateReinterventionTime(
+			  rates=reinterventionRates, 
+			  timeBoundaries=reinterventionTimeBoundaries,
+			  surgeryTime=surgeryTime, currentTime=eventTime, 
+			  postSurgeryInitialPeriod=v1other$postSurgeryInitialPeriod, v3=v3)
+			scheduledEvents[reinterventionEventType] <- gR$time
+			v3 <- gR$v3
+					
 	
 			# Post-surgery monitoring. 
 			if (eventType == "electiveSurgeryOpen") {
@@ -1607,9 +1628,10 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 				eventHistory <- recordSize(eventHistory, trueSize, NA)
 			}
 			if (v3$probOfEmergencySurgeryIfRupture) {
-
-			  emergencySurgeryIsOpen <- getBinaryVariable(
+			  gBV <- getBinaryVariable(
 			    "probOfEmergencySurgeryIsOpen", v1other, v2, v3, eventTime)
+			  emergencySurgeryIsOpen <- gBV$result
+			  v3 <- gBV$v3
 				surgeryEvent <- { if(emergencySurgeryIsOpen)
 						"emergencySurgeryOpen" else "emergencySurgeryEvar" }
 				scheduledEvents[surgeryEvent] <- eventTime
@@ -1640,9 +1662,10 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 
 			} else if (v1other$emergencySurgeryAaaDeathMethod == 
 					"survivalModel") { 
-				scheduledEvents["aaaDeath"] <- eventTime + 
-						generatePostSurgeryAaaDeathTime(v1other, v2, v3, 
-						eventTime, surgeryType, "emergency")
+			  gPS <- generatePostSurgeryAaaDeathTime(v1other, v2, v3, 
+			                                         eventTime, surgeryType, "emergency")
+				scheduledEvents["aaaDeath"] <- eventTime + gPS$time
+				v3 <- gPS$v3		
 				if (is.na(scheduledEvents["aaaDeath"]))
 					stop("generatePostSurgeryAaaDeathTime returned NA")
 				
@@ -1666,12 +1689,14 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			} else {
 				stop("eventType is illegal")
 			}
-			scheduledEvents[reinterventionEventType] <- 
-					generateReinterventionTime(
-					rates=reinterventionRates, 
-					timeBoundaries=reinterventionTimeBoundaries,
-					surgeryTime=surgeryTime, currentTime=eventTime, 
-					postSurgeryInitialPeriod=v1other$postSurgeryInitialPeriod)
+			gR <- generateReinterventionTime(
+			  rates=reinterventionRates, 
+			  timeBoundaries=reinterventionTimeBoundaries,
+			  surgeryTime=surgeryTime, currentTime=eventTime, 
+			  postSurgeryInitialPeriod=v1other$postSurgeryInitialPeriod, v3=v3)
+			scheduledEvents[reinterventionEventType] <- gR$time
+			v3 <- gR$v3
+				
 
 			# Post-surgery monitoring. 
 			if (eventType == "emergencySurgeryOpen") {
@@ -1691,8 +1716,10 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 				stop("incidentalDetection happened when aorta was below ",
 						v1other$thresholdForIncidentalDetection, "cm")
 			scheduledEvents["monitor"] <- eventTime
-			scheduledEvents["dropout"] <- generateDropoutTime( 
-					v2$rateOfDropoutFromMonitoring, eventTime)
+			gD <- generateDropoutTime(eventTime, 
+			                          v2$rateOfDropoutFromMonitoring, v3)
+			scheduledEvents["dropout"] <- gD$time
+			v3 <- gD$v3
 		
 		} else if (eventType == "dropout" | eventType == "discharged") {
 			scheduledEvents["monitor"] <- NA
@@ -1708,13 +1735,14 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 				"reinterventionAfterElectiveEvar", 
 				"reinterventionAfterEmergencyOpen", 
 				"reinterventionAfterEmergencyEvar")) {
-
-			scheduledEvents[eventType] <- 
-					generateReinterventionTime(
-					rates=reinterventionRates, 
-					timeBoundaries=reinterventionTimeBoundaries,
-					surgeryTime=surgeryTime, currentTime=eventTime, 
-					postSurgeryInitialPeriod=v1other$postSurgeryInitialPeriod)
+		  gR <- generateReinterventionTime(
+		    rates=reinterventionRates, 
+		    timeBoundaries=reinterventionTimeBoundaries,
+		    surgeryTime=surgeryTime, currentTime=eventTime, 
+		    postSurgeryInitialPeriod=v1other$postSurgeryInitialPeriod, v3=v3)
+			scheduledEvents[eventType] <- gR$time
+			v3 <- gR$v3
+					
 	
 		} else if (eventType == "monitorFollowingOpenSurgery") {
 			
@@ -1762,14 +1790,18 @@ getBinaryVariable <- function(varName, v1other, v2, v3, eventTime) {
 		covariates <- rep(NA, length(beta) - 1)
 		names(covariates) <- names(beta)[-1]  
 		for (covariateName in names(covariates)) {
+		  ## NEED TO ENSURE v3 IS ASSIGNED BACK TO GENERATEEVENTHISTORY
 			covariates[covariateName] <- switch(covariateName,
 					age = v1other$startAge + eventTime - 80,
 					aortaSize = getAortaMeasurement(v3, eventTime, 
-						v2$ultrasoundMeasurementErrorSD, method="ultrasound") - 6.0,
-			
+						v2$ultrasoundMeasurementErrorSD, method="ultrasound", propensity=v3[["aortaSize"]][1]) - 6.0,
 					stop("in v2$", varName, ", the name \"", covariateName, 
 					"\" is illegal")
 			)
+			if(covariateName == "aortaSize"){
+			  v3[["aortaSize"]] <- v3[["aortaSize"]][-1]
+			}
+			  
 		}
 		
 		# Calculate the probability and use that to generate a boolean value 
@@ -1796,7 +1828,7 @@ getBinaryVariable <- function(varName, v1other, v2, v3, eventTime) {
 		cat("Error in getBinaryVariable: result is NULL or NA.\n")
 		stop("result is ", {if (is.null(result)) "NULL" else result})
 	}
-	return(result)
+	return(list(result = result, v3 = v3))
 }
 
 calculateProbFromLogisticModel <- 
@@ -1860,13 +1892,15 @@ generatePostSurgeryAaaDeathTime <- function(v1other, v2, v3, eventTime,
 	rateVarName <- paste0("rateOfAaaDeathAfter", 
 			surgeryAdmissionMode, surgeryType, "SurgeryAndInitialPeriod")
 	
-	# Generate the AAA death time. 
-	if (getBinaryVariable(probVarName, v1other, v2, v3, eventTime)) {
+	# Generate the AAA death time.
+	gBV <- getBinaryVariable(probVarName, v1other, v2, v3, eventTime)
+	v3 <- gBV$v3
+	if (gBV$result) {
 	#if (rbernoulli(v2[[probVarName]])) {
-		return(0)
+		return(list(time = 0, v3 = v3))
 	} else {
-	  return(v1other$postSurgeryInitialPeriod + 
-	           qexp(v3[[rateVarName]], rate = v2[[rateVarName]]))
+	  return(list(time = v1other$postSurgeryInitialPeriod + 
+	           qexp(v3[[rateVarName]], rate = v2[[rateVarName]]), v3 = v3))
 	  ## Now uses propensity generated for pair of individuals         
 	  #rexp(n=1, rate=v2[[rateVarName]]))
 	}
@@ -1986,15 +2020,15 @@ print.eventHistory <- function(x, ...) {
 # generateReinterventionTime
 generateReinterventionTime <- function(rates, 
 		timeBoundaries=numeric(), surgeryTime, currentTime, 
-		postSurgeryInitialPeriod, verbose=FALSE) {
+		postSurgeryInitialPeriod, v3, verbose=FALSE) {
 	
 	# Check rates, timeBoundaries, surgeryTime, and currentTime.
-	checkReinterventionRatesAndTimeBoundaries(rates, timeBoundaries)
+  checkReinterventionRatesAndTimeBoundaries(rates, timeBoundaries)
 	checkIsSingleNumeric(surgeryTime)
 	checkIsSingleNumeric(currentTime)
 	
 	# If all rates are zero, return NA. No reintervention will be scheduled. 
-	if (all(rates == 0)) return(NA)
+	if (all(rates == 0)) return(list(time = NA, v3 =v3))
 	
 	# If currentTime is before the first possible time of reintervention, 
 	# then replace it with that time. 
@@ -2030,15 +2064,16 @@ generateReinterventionTime <- function(rates,
 		if (ratesToUse[i] == 0) {
 			if (i == numberOfPeriodsToUse) {
 				if (verbose) cat("zero rate in final period; returning NA\n")
-				return(NA)  
+				return(list(time = NA, v3 = v3)) 
 			} else {
 				next 
 			}
 		} 
 		
 		# Generate a time that might be usable as the next reintervention time.
-		possibleResult <- 
-				timeBoundariesForGenerating[i] + rexp(n=1, rate=ratesToUse[i])
+	  # possibleResult <- timeBoundariesForGenerating[i] + rexp(n=1, rate=ratesToUse[i])
+		possibleResult <- timeBoundariesForGenerating[i] +qexp(v3[["rateOfReintervention"]][1], rate=ratesToUse[i])
+		v3[["rateOfReintervention"]] <- v3[["rateOfReintervention"]][-1]
 		if (verbose) cat("i=", i, "  possibleResult (using rate=", 
 					ratesToUse[i], "): ", possibleResult, " ... ", sep="")
 		
@@ -2046,7 +2081,7 @@ generateReinterventionTime <- function(rates,
 		# Otherwise, continue to the next iteration of the for loop.
 		if (possibleResult < timeBoundariesForGenerating[i + 1]) {
 			if (verbose) cat("accepted!\n")
-			return(possibleResult)
+			return(list(time = possibleResult, v3 = v3))
 		} else {
 			if (verbose) cat("rejected\n")
 		}
@@ -2177,7 +2212,7 @@ generateTimeTillNonAaaDeath <- function(v0, v1other) {
 
 # Use three-monthly survival probabilities from MASS to get the survival probabilities 
 # from CSV file and return them as a vector. 
-getMassSurvivalProbabilities <- function(fileName=file.path("input",
+getMassSurvivalProbabilities <- function(fileName=file.path("input/SWAN",
 		"MASS10yrNonAAADeaths.csv")) {
 	fileContents <- read.csv(fileName, comment.char="#")
 	names(fileContents) <- c("cycle", "followUpAtLeast", 
@@ -2355,7 +2390,7 @@ psa <- function(v0, v1other, v1distributions, v2values) {
 		cat("NB v2values has been supplied to psa, so v2 has not been ",
 				"generated by psa.\n", sep="")
 	}
-	
+browser()	
 	# Main PSA loop. 
 	if (v0$method == "serial") {
 		setAndShowRandomSeed(v0$randomSeed, verbose=TRUE)
@@ -2530,7 +2565,11 @@ generateV2 <- function(v1distributions) {
 		  # Allow prevalence to be specified by a logistic model
 		  v2element <- plogis(rnorm(n=1, mean=v1element$mean, sd=sqrt(v1element$variance)))
 	    attr(v2element, "type") <- "probability"
-		} else {
+		} else if (type == "multivariate normal distribution") {
+		  require(MASS, quietly=TRUE)
+		    v2element <- mvrnorm(n=1, 
+		                         mu=v1element$mean, Sigma=v1element$variance)
+		}	else {
 			stop("INTERNAL ERROR: checkArgs should have caught this earlier.",
 					"\n type=", {if (is.null(type)) "NULL" else type}, 
 					" is illegal; elementName=", elementName)
@@ -2643,6 +2682,7 @@ psaAboveDiagnosisThreshold <- function(v0, v1other, v1distributions, v2values,th
 		require(parallel, quietly=TRUE)
 		cluster <- makeCluster(v0$numberOfProcesses)
 		clusterExport(cluster, getAllFunctionsAndStringsInGlobalEnv())
+		clusterExport(cluster, "detectCores")
 		setAndShowRandomSeed(randomSeed=v0$randomSeed, cluster=cluster, 
 				verbose=TRUE) 
 		v0$randomSeed <- NULL 
@@ -2755,7 +2795,7 @@ createQalyFactors <- function(startAge,
 # Given an event-history, the costs, and the names of the required 
 # quantities, calculate the required health-economic quantities.
 calculateHealthEconomicQuantities <- function(
-		eventHistory, namesOfQuantities, costs, v1other) {
+		eventHistory, namesOfQuantities, costs, v1other, v2) {
 	
 	# Check arguments. 
 	if (!inherits(eventHistory, "eventHistory"))
@@ -2774,7 +2814,7 @@ calculateHealthEconomicQuantities <- function(
 	# Calculate QALYs. 
 	result["qalys"] <- adjustLifeYears(result["lifeYears"], 
 			qalyFactorBoundaries=v1other$qalyFactorBoundaries, 
-			qalyFactors=v1other$qalyFactors)
+			qalyFactors=v2$qalyFactors)
 	
 	# Calculate cost.
 	result["cost"] <- sum(costs[eventHistory$events], na.rm=TRUE)
@@ -2787,7 +2827,7 @@ calculateHealthEconomicQuantities <- function(
 	# Calculate discounted QALYs. 
 	result["discountedQalys"] <- adjustLifeYears(result["lifeYears"], 
 			qalyFactorBoundaries=v1other$qalyFactorBoundaries, 
-			qalyFactors=v1other$qalyFactors,
+			qalyFactors=v2$qalyFactors,
 			discountRate=v1other$lifeYearDiscountRate)
 	
 	# Calculate discounted cost.
@@ -3085,14 +3125,15 @@ getUpperQuantile <- function(ciPercent) {
 
 # A function for generating a time to non-AAA death when a person is contraindicated. 
 generateTimeToNonAaaDeathFromContraindication <- function(
-		rateOfNonAaaDeathAfterContraindication) {
-	rexp(n=1, rate=rateOfNonAaaDeathAfterContraindication)
+		rateOfNonAaaDeathAfterContraindication, v3) {
+  qexp(v3[["rateOfNonAaaDeathAfterContraindication"]], rate=rateOfNonAaaDeathAfterContraindication)
 }
 
 # A function for generating a dropout time.
-generateDropoutTime <- function(rateOfDropoutFromMonitoring, 
-		monitoringStartTime) {
-	monitoringStartTime + rexp(n=1, rate=rateOfDropoutFromMonitoring)
+generateDropoutTime <- function(monitoringStartTime, rateOfDropoutFromMonitoring, v3) {
+	time <- monitoringStartTime + qexp(v3[["rateOfDropoutFromMonitoring"]][1], rate=rateOfDropoutFromMonitoring)
+	v3[["rateOfDropoutFromMonitoring"]] <- v3[["rateOfDropoutFromMonitoring"]][-1]
+	return(list(time = time, v3 =v3))
 }
 
 # Set elements of v0 to default values, if they have not already been specified in v0. 
@@ -3344,8 +3385,8 @@ checkV1other <- function(v1other) {
 	# Check v1other$aortaDiameterThresholds and v1other$monitoringIntervals.
 	if (length(v1other$aortaDiameterThresholds) != 
 			length(v1other$monitoringIntervals)) ## updated MS 07/02/19
-		stop("v1other$aortaDiameterThresholds must be of length one less than ",
-				"v1other$monitoringIntervals")
+		stop("v1other$aortaDiameterThresholds must be the same length as v1other$monitoringIntervals. 
+		     The first element of v1other$monitoringIntervals should be the monitoring interval for AAA in surveillance who drop below first diameter threshold")
 	if (!identical(v1other$aortaDiameterThresholds, 
 			sort(v1other$aortaDiameterThresholds)))
 		stop("v1other$aortaDiameterThresholds must be in increasing order")
@@ -3353,6 +3394,18 @@ checkV1other <- function(v1other) {
 			sort(v1other$monitoringIntervals, decreasing=TRUE)))
 		stop("v1other$monitoringIntervals must be in decreasing order")
 	
+  # Check that v1other$maxNumberMonitor exists
+  if(!("maxNumberMonitor" %in% names(v1other)))
+    stop("v1other$maxNumberMonitor must be specified.
+         This gives the maximum number of scans a patient receives for each size category, including below first diameter threshold.
+         Set to Inf for unlimited numbers of scans during lifetime.")
+  
+  # Check length of v1other$maxNumberMonitor
+  if (length(v1other$maxNumberMonitor) != 
+      length(v1other$monitoringIntervals)) 
+    stop("v1other$maxNumberMonitor must be the same length as v1other$monitoringIntervals. 
+         The first element of v1other$maxNumberMonitor should be the number of possible scans when patient drops below first diameter threshold")
+  
 	# Check v1other$zeroGrowthDiameterThreshold, if it exists. 
 	if ("zeroGrowthDiameterThreshold" %in% names(v1other) &&
 			(!is.numeric(v1other$zeroGrowthDiameterThreshold) || 
@@ -3522,6 +3575,19 @@ checkV1distributions <- function(v1distributions) {
 		      !isSingleNumeric(v1element$variance))
 		    raiseV1TypeRelatedError(v1elementName)
 		  
+		} else if (type == "multivariate normal distribution") {
+		  # Check the 1st name is mean and the 2nd is variance or covariance.
+		  if (names(v1element)[[1]] != "mean" || 
+		      !(names(v1element)[[2]] %in% c("variance", "covariance")))
+		    raiseV1TypeRelatedError(v1elementName)
+		  
+		  # It must be a list with elements mean and variance (non single numerics).
+		  if (!is.list(v1element) || 
+		      !identical(names(v1element), c("mean", "variance")) ||
+		      isSingleNumeric(v1element$mean) || 
+		      isSingleNumeric(v1element$variance))
+		    raiseV1TypeRelatedError(v1elementName)
+		  
 		} else if (type == "fixed value for costs") {
 		
 		  	
@@ -3617,7 +3683,12 @@ checkV2 <- function(v2) {
 			if (!is.numeric(v2element) || any(v2element < 0))
 				raiseV2TypeRelatedError(v2elementName)
 			
-		} else {
+		} else if (type == "qaly") {
+		  # It must be a vector of non-negative numerics. 
+		  if (!is.numeric(v2element) || any(v2element < 0))
+		    raiseV2TypeRelatedError(v2elementName)
+		  
+		}	else {
 			stop("type=", {if (is.null(type)) "NULL" else type}, 
 					" is illegal; v2elementName=", v2elementName)
 		}

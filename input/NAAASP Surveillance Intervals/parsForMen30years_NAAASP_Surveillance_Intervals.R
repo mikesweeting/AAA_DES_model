@@ -1,9 +1,11 @@
 ################################################################################
 # Parameters for the men 30 year models
-# Updated 27/08/19 to include
+# Updated 27/08/19 and 27/04/20 to include
 # 1) post-operative surveillance
 # 2) age-dependent (elective and emergency) operative mortality
-# 3) re-intervention rates
+# 3) age-dependent turn-down rates
+# 4) re-intervention rates
+# 5) EQ5D scores that are age-dependent
 
 ################################################################################
 
@@ -50,7 +52,7 @@ v1distributions$probOfNonvisualization <-
 		setType(list(alpha=329, beta=26818), "beta pars for probability")
 		
 # Prevalence proportion
-fileName <- "input/AAA max measurements.csv"
+fileName <- "input/NAAASP Surveillance Intervals/AAA max measurements.csv"
 v1other$baselineDiameters <- read.csv(fileName, comment.char="#")[, c("size", "pw")]
 names(v1other$baselineDiameters) <- c("size", "weight")
 
@@ -150,15 +152,14 @@ v1distributions$extraDiameterForCtScan <-
 # No variables need to be defined here. 
 
 # Decision at consultation: non-intervention proportion
+v2$probOfContraindication <- setType(0.0977 / (0.0977 + 0.681), "probability")
+ v1distributions$probOfContraindication <- 
+ 		setType(list(alpha=69, beta=481), "beta pars for probability")
 ## MS CHANGED TO ALLOW TURN-DOWN RATE TO INCREASE WITH AGE
 ## LOG-ODDS RATIO PER YR INCREASE IS 0.1838371 TAKEN FROM WHIITAKER (DUDLEY) STUDY IN WOMEN
 ## ASSUMING AT MEAN AGE OF CONSULTATION (AROUND 75) THE PROBABILITY IS 18.6% AS FOUND IN SYSTEMATIC REVIEW
-## NO PSA FOR THIS CURRENTLY
-#v2$probOfContraindication <- setType(0.0977 / (0.0977 + 0.681), "probability")
-# v1distributions$probOfContraindication <- 
-# 		setType(list(alpha=69, beta=481), "beta pars for probability")
 # Intercept refers to age 80 so need intercept = qlogis(0.186)+5*0.1838371 = -0.5570
-v2$probOfContraindication <- setType(c(intercept = -0.5570, age = 0.1838371), "logistic model for probability")
+#v2$probOfContraindication <- setType(c(intercept = -0.5570, age = 0.1838371), "logistic model for probability")
 #x <- 70:90
 #plot(x, plogis(-0.557+0.1838371*(x-80)),type="l",ylim=c(0,1))
 		
@@ -172,8 +173,12 @@ v1other$waitingTimeToElectiveSurgery <- 59 / 365.25
 # ELECTIVE OPERATIONS
 
 # Proportion receiving Open vs. EVAR 
-# SOURCE: National Vascular Registry 
+# SOURCE: National Vascular Registry
 me <- c(intercept = -1.044769, age = -0.092481, aortaSize = 0.305962)
+## prob of EVAR at age 80, AAA diameter 6.0cm = 0.74
+# 1-plogis(me["intercept"])
+## exp(0.092481) ## Odds ratio of receiving EVAR per year increase in age
+## exp(-0.305962) ## Odds ratio of receiving EVAR per cm increase in aorta size
 v2$probOfElectiveSurgeryIsOpen <-
  setType(me,
          "logistic model for probability")
@@ -188,6 +193,10 @@ v1other$electiveSurgeryAaaDeathMethod <- "survivalModel"
 # EVAR 30-day operative mortality
 # SOURCE: National Vascular Registry
 me.evar.mort <- c(intercept = -4.80918, age = 0.09267, aortaSize = 0.28863)
+## prob of 30-day mortality following elective EVAR at age 80, AAA diameter 6.0cm = 0.008
+# plogis(me.evar.mort["intercept"])
+# exp(0.09267) ## Odds ratio of receiving EVAR per year increase in age
+# exp(0.28863) ## Odds ratio of receiving EVAR per cm increase in aorta size
 v2$probOfAaaDeathInInitialPeriodAfterElectiveEvarSurgery <-
  setType(me.evar.mort,
 		"logistic model for probability")
@@ -200,6 +209,10 @@ v1distributions$probOfAaaDeathInInitialPeriodAfterElectiveEvarSurgery <-
 # Open repair 30-day operative mortality
 # SOURCE: National Vascular Registry
 me.open.mort <- c(intercept = -2.92497, age = 0.08619, aortaSize = 0.11027)
+## prob of 30-day mortality following elective Open at age 80, AAA diameter 6.0cm = 0.008
+# plogis(me.open.mort["intercept"])
+# exp(0.08619) ## Odds ratio of receiving EVAR per year increase in age
+# exp(0.11027) ## Odds ratio of receiving EVAR per cm increase in aorta size
 v2$probOfAaaDeathInInitialPeriodAfterElectiveOpenSurgery <-
   setType(me.open.mort,
           "logistic model for probability")
@@ -252,6 +265,9 @@ v1distributions$probOfEmergencySurgeryIfRupture <-
 # Proportion receiving Open vs. EVAR repair
 # SOURCE: NVR
 me.emer <- c(intercept = 1.258285, age = -0.044231)
+## prob of EVAR at age 80
+ # 1-plogis(me.emer["intercept"])
+ # exp(0.044231) ## Odds ratio of receiving EVAR per year increase in age
 v2$probOfEmergencySurgeryIsOpen <- 
   setType(me.emer, 
           "logistic model for probability")
@@ -268,7 +284,10 @@ v1distributions$probOfEmergencySurgeryIsOpen <-
 # EVAR 30-day operative mortality
 # SOURCE: NVR
  me.emer.evar <- c(intercept = -1.26631, age = 0.04943)
- v2$probOfAaaDeathInInitialPeriodAfterEmergencyEvarSurgery <-
+ ## prob of 30-day mortality following emergency EVAR at age 80
+ #  plogis(me.emer.evar["intercept"])
+ #  exp(0.04943) ## Odds ratio of receiving EVAR per year increase in age
+  v2$probOfAaaDeathInInitialPeriodAfterEmergencyEvarSurgery <-
    setType(me.emer.evar,
            "logistic model for probability")
  co.emer.ever <- matrix(c(8.61E-03, 9.27E-05, 9.27E-05, 1.51E-04), nrow=2)
@@ -280,6 +299,9 @@ v1distributions$probOfEmergencySurgeryIsOpen <-
 # Open repair 30-day operative mortality
 # SOURCE: NVR
  me.emer.open <- c(intercept = -0.239289, age = 0.064316)
+ ## prob of 30-day mortality following emergency Open at age 80
+   # plogis(me.emer.open["intercept"])
+   # exp(0.064316) ## Odds ratio of receiving EVAR per year increase in age
  v2$probOfAaaDeathInInitialPeriodAfterEmergencyOpenSurgery <-
    setType(me.emer.open,
            "logistic model for probability")
@@ -290,7 +312,7 @@ v1distributions$probOfEmergencySurgeryIsOpen <-
           "hyperpars for logistic model for probability")
 
  
-# Re-intervention rate after successful EVAR
+# Re-intervention rate after successful Emergency EVAR
 # SOURCE: IMPROVE Trial
  v2$reinterventionRatesAfterEmergencyEvar <-
    setType(10.9 / 100, "reintervention rates")
@@ -305,14 +327,14 @@ v1distributions$probOfEmergencySurgeryIsOpen <-
  v1distributions$reinterventionRatesAfterEmergencyOpen <-
    setType(list(shape=25, scale=1/410), "gamma pars for rate")
 
-# Long-term rate of death after EVAR
+# Long-term rate of death after emergency EVAR
 # SOURCE: IMPROVE Trial
  v2$rateOfAaaDeathAfterEmergencyEvarSurgeryAndInitialPeriod <-
    setType(0.985/100, "rate")  
  v1distributions$rateOfAaaDeathAfterEmergencyEvarSurgeryAndInitialPeriod <-
    setType(list(shape=4, scale=1/406), "gamma pars for rate")
  
-# Long-term rate of death after Open
+# Long-term rate of death after emergency Open
 # SOURCE: IMPROVE Trial
  v2$rateOfAaaDeathAfterEmergencyOpenSurgeryAndInitialPeriod <-
    setType(1.437 / 100, "rate")
@@ -320,27 +342,32 @@ v1distributions$probOfEmergencySurgeryIsOpen <-
    setType(list(shape=9, scale=1/626), "gamma pars for rate")
 
 ################################################################################
-# COSTS (SAME AS SWAN MODEL FOR WOMEN)
+# COSTS 
  v2$costs <- setType(c(
-   inviteToScreen=1.80,  # SOURCE: NAAASP
-   requireReinvitation=1.80, # SOURCE: NAAASP
-   screen=34.11, # SOURCE: NAAASP
-   monitor=72.03, # SOURCE: NAAASP
-   monitorFollowingContraindication=72.03, # SOURCE: NAAASP
-   consultation=328.64, # SOURCE: NHS Reference Costs
-   electiveSurgeryEvar=12993, # SOURCE: EVAR-1 & HES LOS
-   electiveSurgeryOpen=11712, # SOURCE: EVAR-1 & HES LOS
-   emergencySurgeryEvar=18045, # SOURCE: IMPROVE & HES LOS
-   emergencySurgeryOpen=17995, # SOURCE: IMPROVE & HES LOS
-   reinterventionAfterElectiveEvar=8651, # SOURCE: EVAR-1
-   reinterventionAfterElectiveOpen=11459, # SOURCE: EVAR-1
-   reinterventionAfterEmergencyEvar=8651, # SOURCE: EVAR-1
-   reinterventionAfterEmergencyOpen=11459, # SOURCE: EVAR-1
-   monitorFollowingEvarSurgery=258.16, # SOURCE: NHS Reference Costs
-   monitorFollowingOpenSurgery=196.79 # SOURCE: NHS Reference Costs
+   inviteToScreen=1.91,  # SOURCE: NAAASP inflated to 2018/19 prices (Curtis and Burns inflation indices)
+   requireReinvitation=1.91, # SOURCE: NAAASP inflated to 2018/19 prices (Curtis and Burns inflation indices)
+   screen=36.18, # SOURCE: NAAASP inflated to 2018/19 prices (Curtis and Burns inflation indices)
+   monitor=76.40, # SOURCE: NAAASP inflated to 2018/19 prices (Curtis and Burns inflation indices)
+   monitorFollowingContraindication=76.40, # SOURCE: NAAASP inflated to 2018/19 prices (Curtis and Burns inflation indices)
+   consultation=315.37, # SOURCE: NHS Reference Costs 17/18 and 18/19
+   electiveSurgeryEvar=13357.75, # SOURCE: EVAR-1 & HES LOS (Curtis and Burns inflation)
+   electiveSurgeryOpen=12866.82, # SOURCE: EVAR-1 & HES LOS (Curtis and Burns inflation)
+   emergencySurgeryEvar=19941.99, # SOURCE: IMPROVE & HES LOS (Curtis and Burns inflation)
+   emergencySurgeryOpen=20232.53, # SOURCE: IMPROVE & HES LOS (Curtis and Burns inflation)
+   reinterventionAfterElectiveEvar=9175.81, # SOURCE: EVAR-1 (Curtis and Burns inflation)
+   reinterventionAfterElectiveOpen=12249.27, # SOURCE: EVAR-1 (Curtis and Burns inflation)
+   reinterventionAfterEmergencyEvar=9175.81, # SOURCE: EVAR-1 (Curtis and Burns inflation)
+   reinterventionAfterEmergencyOpen=12249.27, # SOURCE: EVAR-1 (Curtis and Burns inflation)
+   monitorFollowingEvarSurgery=267.43, # SOURCE: Clinical opinion / NHS Reference Costs
+   monitorFollowingOpenSurgery=188.84 # SOURCE: Clinical opinion / NHS Reference Costs
  ), type="costs")
 
-v1distributions$costs <- setType(v2$costs, "fixed value for costs")
+
+## PSA to include 95% interval that is -20%, +25%
+ v1distributions$costs <- 
+ setType(list(mean=log(v2$costs), variance=rep((0.114)^2,length(v2$costs))), "distribution for costs")
+ names(v1distributions$costs$variance) <- names(v1distributions$costs$mean)
+
 
 ################################################################################
 # MISCELLANEOUS
@@ -348,17 +375,27 @@ v1distributions$costs <- setType(v2$costs, "fixed value for costs")
 # Non-AAA mortality rate
 v1other$nonAaaDeathMethod <- "onsIntegerStart"
 v1other$nonAaaMortalityRatesFileName <- 
-	"input/nonAaaDeathMortalityRatesForMen.csv"  
+	"input/NAAASP Surveillance Intervals/nonAaaDeathMortalityRatesForMen_NAAASP_Surveillance_Intervals.csv"  
 
-# Non-AAA mortality rate in those contraindicated
-## REMOVED THIS DUE TO ISSUE WITH BIASING INCREMENTAL EFFECTS (CONTRAINDICATION DEATH RATE ONLY APPLIED ONCE INDIVIDUAL IS DIAGNOSED)
-# v2$rateOfNonAaaDeathAfterContraindication <- setType(41 / 166, "rate")
-# v1distributions$rateOfNonAaaDeathAfterContraindication <- setType(list(
-# 		shape=41, scale=4*0.0015), "gamma pars for rate")
 
 # Overall QoL / utilities
-v1other <- compactList(append(v1other,
-		createQalyFactors(startAge=v1other$startAge)))
+#		createQalyFactors(startAge=v1other$startAge)))
+# SOURCE: Love-Koh 2015 (https://reader.elsevier.com/reader/sd/pii/S1098301515018471?token=AB11057F469D57EBE990778CCDC883E9D35D3CFD83AD143352F3AD497E822198F957DBCE2EA86AE6DC16F2F6CE350409)
+qol.coef <- c(0.0340613, 0.0475121, 0.0746856, 0.0857069, -0.0021861, -0.00000798, -0.0209698, 0.9346683)
+names(qol.coef) <- c("dep2", "dep3", "dep4", "dep5", "age", "agesq", "female", "_cons")
+## Cholesky decomposition of vcov matrix from Love-Koh. 
+qol.chol <- as.matrix(read.csv("input/NAAASP Surveillance Intervals/QOL_Cholesky.csv", header=F))
+rownames(qol.chol) <- colnames(qol.chol) <- names(qol.coef)
+## Assign these to v1other inputs
+## Using deprivation quintile 3 (median group)
+v1other$qalyFactorBoundaries <- 1:35 ## years after age 65 that calculate new EQ5D
+qol.ages <- 65:100
+X <- cbind(0, 1, 0, 0, 65:100, (65:100)^2, 0, 1) ## Design matrix
+v2$qalyFactors <- setType(c(X %*% t(t(qol.coef))), "qaly")
+#v1other$qalyFactors <- qol.coef["_cons"] + qol.coef["dep3"] + qol.ages*qol.coef["age"] + qol.ages^2*qol.coef["agesq"]
+qalyFactors.vcov <- X %*% qol.chol %*% t(qol.chol) %*% t(X)
+v1distributions$qalyFactors <- setType(list(mean = v2$qalyFactors, variance = qalyFactors.vcov), "multivariate normal distribution")
+
 
 # Discount rates
 v1other$lifeYearDiscountRate <- 3.5 / 100
