@@ -10,17 +10,17 @@
 # screening options, and has been validated in men using  data from the randomised 
 # Multicentre Aneurysm Screening Study [Glover et al. Discrete Event Simulation 
 # for Decision Modeling in Health Care: Lessons from Abdominal Aortic Aneurysm 
-# Screening. Medical Decision Making. 2018]. It simulates a sequence of key screening and clinical events for 10 
-# million women from the time of invitation, to screening up to their date of 
-# death or age 95 years (the time horizon). Each woman has a counterpart who 
+# Screening. Medical Decision Making. 2018]. It simulates a sequence of key screening and clinical events for N 
+# persons from the time of invitation, to screening up to their date of 
+# death or a censoing time (the time horizon). Each person has a counterpart who 
 # shares some key characteristics (age, aortic diameter at baseline, rate of 
 # aortic growth, or potential time of non-AAA-related death), except that the 
 # counterpart is not invited to screening. 
 
 # The structure of the model [Appendix of Sweeting et al. Should we screen 
-# women for abdominal aortic aneurysm? A cost-effectiveness analysis. The Lancet. 2018] allows women 
+# women for abdominal aortic aneurysm? A cost-effectiveness analysis. The Lancet. 2018] allows people 
 # to drop out of the surveillance programme or for an AAA to be incidentally 
-# detected. Women who are referred for a consultation can either be returned to 
+# detected. Persons who are referred for a consultation can either be returned to 
 # surveillance if their diameter, as confirmed by a CT scan, is less than the 
 # intervention threshold; placed on a waiting list for elective surgery; or 
 # are not offered repair because of the high surgical risk associated with 
@@ -28,7 +28,9 @@
 
 # Predefined outcomes from the model are death caused by AAA, life-years, QALYs, 
 # costs, and the incremental cost-effectiveness ratio (ICER). Both costs and 
-# life-years are discounted at 3?5% per annum (appendix). Input parameters for 
+# life-years can be discounted. 
+
+# Input parameters for 
 # women have been obtained from a combination of literature reviews, clinical 
 # trial data, bespoke hospital datasets, and analysis of routine and registry 
 # data sources. Further details included in [Sweeting et al. Should we 
@@ -84,256 +86,261 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
   require(tibble)
   
   ## Main Data Items
-  DESData <- read_excel(dataFile, sheet = "Main Data Items", range="A7:AA200", 
-                     col_names = T)
-  DESData <- subset(DESData, !is.na(DESData$varname))
-	
-  ## Growth and rupture rate data
-  growthData <- suppressMessages(read_excel(dataFile, sheet = "Growth and Rupture Rates", range="A19:I200", 
-                     col_names = T))
-  growthData <- subset(growthData, !is.na(growthData$varname))
-
-  ## AAA Size Distribution
-  v1other$baselineDiameters <- read_excel(dataFile, sheet = "AAA Size Distribution",  
-                                col_names = T, skip = 4)
-  names(v1other$baselineDiameters) <- c("size", "weight")
-  v1other$baselineDiameters <- subset(v1other$baselineDiameters, !is.na(v1other$baselineDiameters$size))
-  
-  ## Model parameters
-  modelParameters <- read_excel(dataFile, sheet = "Model Parameters", range="A6:D200", 
-                               col_names = T)
-  modelParameters <- subset(modelParameters, !is.na(modelParameters$varname))
-  
+  if(!is.null(dataFile)){
+    DESData <- read_excel(dataFile, sheet = "Main Data Items", range="A7:AA200", 
+                          col_names = T)
+    DESData <- subset(DESData, !is.na(DESData$varname))
+    
+    ## Growth and rupture rate data
+    growthData <- suppressMessages(read_excel(dataFile, sheet = "Growth and Rupture Rates", range="A19:I200", 
+                                              col_names = T))
+    growthData <- subset(growthData, !is.na(growthData$varname))
+    
+    ## AAA Size Distribution
+    v1other$baselineDiameters <- read_excel(dataFile, sheet = "AAA Size Distribution",  
+                                            col_names = T, skip = 4)
+    names(v1other$baselineDiameters) <- c("size", "weight")
+    v1other$baselineDiameters <- subset(v1other$baselineDiameters, !is.na(v1other$baselineDiameters$size))
+    
+    ## Model parameters
+    modelParameters <- read_excel(dataFile, sheet = "Model Parameters", range="A6:D200", 
+                                  col_names = T)
+    modelParameters <- subset(modelParameters, !is.na(modelParameters$varname))
+    
     ## Other cause mortality
-  nonAAA <- read_excel(dataFile, sheet = "Other cause mortality", 
-                        col_names = T, skip = 4)
-  nonAAA <- column_to_rownames(nonAAA, var = "Age")
-  v1other$nonAaaMortalityRatesFileName <- nonAAA ## allow dataset to be given instead of a csv file name. Change readMortalityRatesFromFile 
-
-
-  ## For now always set these to "survivalModel"
-  v1other$electiveSurgeryAaaDeathMethod <- "survivalModel"
-  v1other$emergencySurgeryAaaDeathMethod <- "survivalModel"
-  ## For now always set this to "onsIntegerStart"
-  v1other$nonAaaDeathMethod <- "onsIntegerStart"
-  ## For now always set period where re-interventions are not counted (part of initial operation period) to 30 days
-  v1other$postSurgeryInitialPeriod <- 30 / 365.25
- 
-  ## Assign main values
-  for(i in 1:dim(DESData)[1]){
-    if(!is.na(DESData$Value[i])){
-      if(!is.na(DESData$type[i])){
-        if(DESData$type[i] == "\"function\""){
-          eval(parse(text=paste0(DESData$varname[i],"<- function() {", DESData$Value[i], "}")))
+    nonAAA <- read_excel(dataFile, sheet = "Other cause mortality", 
+                         col_names = T, skip = 4)
+    nonAAA <- column_to_rownames(nonAAA, var = "Age")
+    v1other$nonAaaMortalityRatesFileName <- nonAAA ## allow dataset to be given instead of a csv file name. Change readMortalityRatesFromFile 
+    
+    
+    ## For now always set these to "survivalModel"
+    v1other$electiveSurgeryAaaDeathMethod <- "survivalModel"
+    v1other$emergencySurgeryAaaDeathMethod <- "survivalModel"
+    ## For now always set this to "onsIntegerStart"
+    v1other$nonAaaDeathMethod <- "onsIntegerStart"
+    ## For now always set period where re-interventions are not counted (part of initial operation period) to 30 days
+    v1other$postSurgeryInitialPeriod <- 30 / 365.25
+    
+    ## Assign main values
+    for(i in 1:dim(DESData)[1]){
+      if(!is.na(DESData$Value[i])){
+        if(!is.na(DESData$type[i])){
+          if(DESData$type[i] == "\"function\""){
+            eval(parse(text=paste0(DESData$varname[i],"<- function() {", DESData$Value[i], "}")))
+          } else {
+            eval(parse(text=paste0(DESData$varname[i],"<- setType(", DESData$Value[i],
+                                   ", type =", DESData$type[i], ")")))
+          }
         } else {
-        eval(parse(text=paste0(DESData$varname[i],"<- setType(", DESData$Value[i],
-                               ", type =", DESData$type[i], ")")))
+          eval(parse(text=paste0(DESData$varname[i],"<- ", DESData$Value[i])))
         }
+      } else if(!is.na(DESData[i, "intercept"])) {
+        pars <- unlist(DESData[i,c("intercept","age","aortaSize")])
+        pars <- pars[!is.na(pars)]
+        eval(parse(text=paste0(DESData$varname[i],"<- setType(pars, type =", DESData$type[i], ")")))
       } else {
         eval(parse(text=paste0(DESData$varname[i],"<- ", DESData$Value[i])))
       }
-    } else if(!is.na(DESData[i, "intercept"])) {
-      pars <- unlist(DESData[i,c("intercept","age","aortaSize")])
-      pars <- pars[!is.na(pars)]
-      eval(parse(text=paste0(DESData$varname[i],"<- setType(pars, type =", DESData$type[i], ")")))
-    } else {
-      eval(parse(text=paste0(DESData$varname[i],"<- ", DESData$Value[i])))
     }
-  }
- 
+    
+    
+    ## Assign list of costs
+    v2$costs <- setType(c(
+      inviteToScreen=costs.inviteToScreen, 
+      requireReinvitation=costs.requireReinvitation, 
+      screen=costs.screen, 
+      monitor=costs.monitor,
+      monitorFollowingContraindication=costs.monitorFollowingContraindication,   
+      consultation=costs.consultation,
+      electiveSurgeryEvar=costs.electiveSurgeryEvar,  
+      electiveSurgeryOpen=costs.electiveSurgeryOpen,
+      emergencySurgeryEvar=costs.emergencySurgeryEvar,
+      emergencySurgeryOpen=costs.emergencySurgeryOpen,
+      monitorFollowingEvarSurgery=costs.monitorFollowingEvarSurgery,
+      monitorFollowingOpenSurgery=costs.monitorFollowingOpenSurgery,
+      reinterventionAfterElectiveEvar=costs.reinterventionAfterElectiveEvar,
+      reinterventionAfterElectiveOpen=costs.reinterventionAfterElectiveOpen,
+      reinterventionAfterEmergencyEvar=costs.reinterventionAfterEmergencyEvar,
+      reinterventionAfterEmergencyOpen=costs.reinterventionAfterEmergencyOpen
+    ), type="costs")
+    
+    ## Assign QoL utilities
+    # Overall QoL / utilities
 
-  ## Assign list of costs
-  v2$costs <- setType(c(
-    inviteToScreen=costs.inviteToScreen, 
-    requireReinvitation=costs.requireReinvitation, 
-    screen=costs.screen, 
-    monitor=costs.monitor,
-    monitorFollowingContraindication=costs.monitorFollowingContraindication,   
-    consultation=costs.consultation,
-    electiveSurgeryEvar=costs.electiveSurgeryEvar,  
-    electiveSurgeryOpen=costs.electiveSurgeryOpen,
-    emergencySurgeryEvar=costs.emergencySurgeryEvar,
-    emergencySurgeryOpen=costs.emergencySurgeryOpen,
-    monitorFollowingEvarSurgery=costs.monitorFollowingEvarSurgery,
-    monitorFollowingOpenSurgery=costs.monitorFollowingOpenSurgery,
-    reinterventionAfterElectiveEvar=costs.reinterventionAfterElectiveEvar,
-    reinterventionAfterElectiveOpen=costs.reinterventionAfterElectiveOpen,
-    reinterventionAfterEmergencyEvar=costs.reinterventionAfterEmergencyEvar,
-    reinterventionAfterEmergencyOpen=costs.reinterventionAfterEmergencyOpen
-  ), type="costs")
-
-  ## Assign QoL utilities
-  # Overall QoL / utilities
-  v2 <- compactList(append(v2, createQalyFactors(
-    startAge=v1other$startAge,
-    qalyFactorBoundariesAsAges = qalyFactorBoundariesAsAges,
-    qalyFactorsForAges = qalyFactorsForAges
-  )))
-
-  ## Assign growth and rupture rate values
-  for(i in 1:dim(growthData)[1]){
-    if(!is.na(growthData$Value[i])){
-      if(!is.na(growthData$type[i])){
-        if(growthData$type[i] != "\"hyperpars for aorta model\""){
-          eval(parse(text=paste0(growthData$varname[i],"<- setType(", growthData$Value[i],
-                                 ", type =", growthData$type[i], ")")))
-        } else {
-          if(growthData$varname[i] == "v1distributions$covarianceForGrowthParameters"){
-            eval(parse(text=paste0(growthData$varname[i],"<- setType( matrix( nrow = 6, data = c(", 
-                                   paste(unlist(growthData[i:(i+5),4:9]), collapse=", "),
-                                   ")), type =", growthData$type[i], ")")))
-            s <- v1distributions$covarianceForGrowthParameters
-            s[lower.tri(s)] <- t(s)[lower.tri(s)]
-            v1distributions$covarianceForGrowthParameters <- s
-          } else if(growthData$varname[i] == "v1distributions$covarianceForRuptureParameters"){
-            eval(parse(text=paste0(growthData$varname[i],"<- setType( matrix( nrow = 2, data = c(", 
-                                   paste(unlist(growthData[i:(i+1),4:5]), collapse=", "),
-                                   ")), type =", growthData$type[i], ")")))
-            s <- v1distributions$covarianceForRuptureParameters
-            s[lower.tri(s)] <- t(s)[lower.tri(s)]
-            v1distributions$covarianceForRuptureParameters <- s
+    qalys <- createQalyFactors(
+      startAge=v1other$startAge,
+      qalyFactorBoundariesAsAges = qalyFactorBoundariesAsAges,
+      qalyFactorsForAges = qalyFactorsForAges
+    )
+    v2$qalyFactors <- setType(qalys$qalyFactors, "qaly")
+    v1other$qalyFactorBoundaries <- qalys$qalyFactorBoundaries
+    
+    ## Assign growth and rupture rate values
+    for(i in 1:dim(growthData)[1]){
+      if(!is.na(growthData$Value[i])){
+        if(!is.na(growthData$type[i])){
+          if(growthData$type[i] != "\"hyperpars for aorta model\""){
+            eval(parse(text=paste0(growthData$varname[i],"<- setType(", growthData$Value[i],
+                                   ", type =", growthData$type[i], ")")))
+          } else {
+            if(growthData$varname[i] == "v1distributions$covarianceForGrowthParameters"){
+              eval(parse(text=paste0(growthData$varname[i],"<- setType( matrix( nrow = 6, data = c(", 
+                                     paste(unlist(growthData[i:(i+5),4:9]), collapse=", "),
+                                     ")), type =", growthData$type[i], ")")))
+              s <- v1distributions$covarianceForGrowthParameters
+              s[lower.tri(s)] <- t(s)[lower.tri(s)]
+              v1distributions$covarianceForGrowthParameters <- s
+            } else if(growthData$varname[i] == "v1distributions$covarianceForRuptureParameters"){
+              eval(parse(text=paste0(growthData$varname[i],"<- setType( matrix( nrow = 2, data = c(", 
+                                     paste(unlist(growthData[i:(i+1),4:5]), collapse=", "),
+                                     ")), type =", growthData$type[i], ")")))
+              s <- v1distributions$covarianceForRuptureParameters
+              s[lower.tri(s)] <- t(s)[lower.tri(s)]
+              v1distributions$covarianceForRuptureParameters <- s
+            }
+            
           }
-          
         }
       }
     }
-  }
-  growthParameterNames <- 
-    c("beta1", "beta0", "logSigma1", "logSigma0", "atanhRho", "logSigmaW")
-  ruptureParameterNames <- c("alpha", "gamma")
-  v1distributions$meanForGrowthParameters <- setType(
-    c(v2$beta1, v2$beta0, log(v2$sigma1), log(v2$sigma0), atanh(v2$rho), log(v2$sigmaW)),
-    "hyperpars for aorta model")
-  names(v1distributions$meanForGrowthParameters) <- growthParameterNames
-  v1distributions$meanForRuptureParameters <- 
-     setType(c(v2$alpha, v2$gamma), "hyperpars for aorta model")
-  dimnames(v1distributions$covarianceForGrowthParameters) <-
-    list(growthParameterNames, growthParameterNames)
-  names(v1distributions$meanForRuptureParameters) <- ruptureParameterNames
-  dimnames(v1distributions$covarianceForRuptureParameters) <-
-    list(ruptureParameterNames, ruptureParameterNames)
-
-  ## Assign model parameters
-  for(i in 1:dim(modelParameters)[1]){
-    if(!is.na(modelParameters$Value[i])){
-      if(!is.na(modelParameters$type[i])){
-        if(modelParameters$type[i] == "\"function\""){
-          eval(parse(text=paste0(modelParameters$varname[i],"<- function() {", modelParameters$Value[i], "}")))
+    growthParameterNames <- 
+      c("beta1", "beta0", "logSigma1", "logSigma0", "atanhRho", "logSigmaW")
+    ruptureParameterNames <- c("alpha", "gamma")
+    v1distributions$meanForGrowthParameters <- setType(
+      c(v2$beta1, v2$beta0, log(v2$sigma1), log(v2$sigma0), atanh(v2$rho), log(v2$sigmaW)),
+      "hyperpars for aorta model")
+    names(v1distributions$meanForGrowthParameters) <- growthParameterNames
+    v1distributions$meanForRuptureParameters <- 
+      setType(c(v2$alpha, v2$gamma), "hyperpars for aorta model")
+    dimnames(v1distributions$covarianceForGrowthParameters) <-
+      list(growthParameterNames, growthParameterNames)
+    names(v1distributions$meanForRuptureParameters) <- ruptureParameterNames
+    dimnames(v1distributions$covarianceForRuptureParameters) <-
+      list(ruptureParameterNames, ruptureParameterNames)
+    
+    ## Assign model parameters
+    for(i in 1:dim(modelParameters)[1]){
+      if(!is.na(modelParameters$Value[i])){
+        if(!is.na(modelParameters$type[i])){
+          if(modelParameters$type[i] == "\"function\""){
+            eval(parse(text=paste0(modelParameters$varname[i],"<- function() {", modelParameters$Value[i], "}")))
+          } else {
+            eval(parse(text=paste0(modelParameters$varname[i],"<- setType(", modelParameters$Value[i],
+                                   ", type =", modelParameters$type[i], ")")))
+          }
         } else {
-          eval(parse(text=paste0(modelParameters$varname[i],"<- setType(", modelParameters$Value[i],
-                                 ", type =", modelParameters$type[i], ")")))
+          eval(parse(text=paste0(modelParameters$varname[i],"<- ", modelParameters$Value[i])))
         }
-      } else {
-        eval(parse(text=paste0(modelParameters$varname[i],"<- ", modelParameters$Value[i])))
-      }
-    }
-  }
-  
-  ## Assign last monitoring interval input to v1other$monitoringIntervalFollowingContraindication and remove it from v1other$monitoringIntervals
-  v1other$monitoringIntervalFollowingContraindication <- v1other$monitoringIntervals[length(v1other$monitoringIntervals)]
-  v1other$monitoringIntervals <- v1other$monitoringIntervals[-length(v1other$monitoringIntervals)]
-
-  ## Assign PSA probability distributions
-  mean.d.costs <- variance.d.costs <- list()
-  for(i in 1:dim(DESData)[1]){
-    if(DESData$distribution.type[i]=="\"fixed value for probability\""){
-      eval(parse(text=paste0(DESData$distribution.varname[i],"<- setType(", 
-                             DESData$varname[i], ", type =", 
-                             DESData$distribution.type[i], ")")))  
-    }
-    if(DESData$distribution.type[i]=="\"beta pars for probability\""){
-      eval(parse(text=paste0(DESData$distribution.varname[i],
-                             "<- setType(list(alpha=",
-                             DESData$alpha[i], ", beta=", DESData$beta[i], 
-                             "), type =", 
-                             DESData$distribution.type[i], ")")))  
-    }
-    if(DESData$distribution.type[i]=="\"normal distribution for logit prevalence\""){
-      eval(parse(text=paste0(DESData$distribution.varname[i],
-                             "<- setType(list(mean=",
-                             DESData$mean[i], ", variance=", DESData$sd[i]^2, 
-                             "), type =", 
-                             DESData$distribution.type[i], ")")))  
-    }
-    if(DESData$distribution.type[i]=="\"truncated normal distribution\""){
-      eval(parse(text=paste0(DESData$distribution.varname[i],
-                             "<- setType(list(mean=",
-                             DESData$trunc.mean[i], ", variance=", DESData$trunc.sd[i]^2, 
-                             "), type =", 
-                             DESData$distribution.type[i], ")")))  
-    }
-    if(DESData$distribution.type[i] %in% "\"gamma pars for rate\""){
-      eval(parse(text=paste0(DESData$distribution.varname[i],
-                             "<- setType(list(shape=",
-                             DESData$shape[i], ", scale=", DESData$scale[i], 
-                             "), type =", 
-                             DESData$distribution.type[i], ")")))  
-    }
-    if(DESData$distribution.type[i] %in% "\"gamma pars for multiple rates\""){
-      eval(parse(text=paste0(DESData$distribution.varname[i],
-                             "<- setType(list(shapes=",
-                             DESData$shape[i], ", scales=", DESData$scale[i], 
-                             "), type =", 
-                             DESData$distribution.type[i], ")")))  
-    }
-    if(DESData$distribution.type[i] %in% c("\"fixed value\"", "\"fixed value for rate\"", "\"fixed value for reintervention rates\"")){
-      eval(parse(text=paste0(DESData$distribution.varname[i],
-                             "<- setType(",
-                             DESData$varname[i],
-                             ", type =", 
-                             DESData$distribution.type[i], ")")))  
-    }
-    if(DESData$distribution.type[i]=="\"hyperpars for logistic model for probability\""){
-
-      me <- unlist(DESData[i,c("mean intercept","mean age","mean aortaSize")])
-      names(me)<-c("intercept","age","aortaSize")
-      cov.vec <- unlist(DESData[i,c("variance intercept","covariance intercept/age","covariance intercept/aortaSize","variance age","covariance age/aortaSize","variance aortaSize")])
-      names(cov.vec) <- c("V11", "V12", "V13", "V22", "V23", "V33")
-      cov <- matrix(cov.vec[c(1:3,2,4:5,3,5:6)],nrow=3)
-      dimnames(cov) <- list(names(me), names(me))
-      if(sum(!is.na(me))==1){ ## only intercept specified
-        eval(parse(text=paste0(DESData$distribution.varname[i],
-                               "<- setType(list(mean=",
-                               me[1],
-                               ", variance=",
-                               cov[1,1],
-                               "), type =", 
-                               DESData$distribution.type[i], ")")))  
-      } else {
-        cov <- cov[!is.na(me), !is.na(me)]
-        me <- me[!is.na(me)]
-        eval(parse(text=paste0(DESData$distribution.varname[i],
-                               "<- setType(list(mean= me, covariance= cov), type =", 
-                               DESData$distribution.type[i], ")")))  
       }
     }
     
-    if(DESData$distribution.type[i] == "\"distribution for costs\""){
-      eval(parse(text=paste0("mean.",DESData$distribution.varname[i],
-                             " <-", DESData$mean[i])))  
-      eval(parse(text=paste0("variance.", DESData$distribution.varname[i],
-                             " <-", DESData$sd[i]^2)))  
+    ## Assign last monitoring interval input to v1other$monitoringIntervalFollowingContraindication and remove it from v1other$monitoringIntervals
+    v1other$monitoringIntervalFollowingContraindication <- v1other$monitoringIntervals[length(v1other$monitoringIntervals)]
+    v1other$monitoringIntervals <- v1other$monitoringIntervals[-length(v1other$monitoringIntervals)]
+    
+    ## Assign PSA probability distributions
+    mean.d.costs <- variance.d.costs <- list()
+    for(i in 1:dim(DESData)[1]){
+      if(DESData$distribution.type[i]=="\"fixed value for probability\""){
+        eval(parse(text=paste0(DESData$distribution.varname[i],"<- setType(", 
+                               DESData$varname[i], ", type =", 
+                               DESData$distribution.type[i], ")")))  
+      }
+      if(DESData$distribution.type[i]=="\"beta pars for probability\""){
+        eval(parse(text=paste0(DESData$distribution.varname[i],
+                               "<- setType(list(alpha=",
+                               DESData$alpha[i], ", beta=", DESData$beta[i], 
+                               "), type =", 
+                               DESData$distribution.type[i], ")")))  
+      }
+      if(DESData$distribution.type[i]=="\"normal distribution for logit prevalence\""){
+        eval(parse(text=paste0(DESData$distribution.varname[i],
+                               "<- setType(list(mean=",
+                               DESData$mean[i], ", variance=", DESData$sd[i]^2, 
+                               "), type =", 
+                               DESData$distribution.type[i], ")")))  
+      }
+      if(DESData$distribution.type[i]=="\"truncated normal distribution\""){
+        eval(parse(text=paste0(DESData$distribution.varname[i],
+                               "<- setType(list(mean=",
+                               DESData$trunc.mean[i], ", variance=", DESData$trunc.sd[i]^2, 
+                               "), type =", 
+                               DESData$distribution.type[i], ")")))  
+      }
+      if(DESData$distribution.type[i] %in% "\"gamma pars for rate\""){
+        eval(parse(text=paste0(DESData$distribution.varname[i],
+                               "<- setType(list(shape=",
+                               DESData$shape[i], ", scale=", DESData$scale[i], 
+                               "), type =", 
+                               DESData$distribution.type[i], ")")))  
+      }
+      if(DESData$distribution.type[i] %in% "\"gamma pars for multiple rates\""){
+        eval(parse(text=paste0(DESData$distribution.varname[i],
+                               "<- setType(list(shapes=",
+                               DESData$shape[i], ", scales=", DESData$scale[i], 
+                               "), type =", 
+                               DESData$distribution.type[i], ")")))  
+      }
+      if(DESData$distribution.type[i] %in% c("\"fixed value\"", "\"fixed value for rate\"", "\"fixed value for reintervention rates\"")){
+        eval(parse(text=paste0(DESData$distribution.varname[i],
+                               "<- setType(",
+                               DESData$varname[i],
+                               ", type =", 
+                               DESData$distribution.type[i], ")")))  
+      }
+      if(DESData$distribution.type[i]=="\"hyperpars for logistic model for probability\""){
+        
+        me <- unlist(DESData[i,c("mean intercept","mean age","mean aortaSize")])
+        names(me)<-c("intercept","age","aortaSize")
+        cov.vec <- unlist(DESData[i,c("variance intercept","covariance intercept/age","covariance intercept/aortaSize","variance age","covariance age/aortaSize","variance aortaSize")])
+        names(cov.vec) <- c("V11", "V12", "V13", "V22", "V23", "V33")
+        cov <- matrix(cov.vec[c(1:3,2,4:5,3,5:6)],nrow=3)
+        dimnames(cov) <- list(names(me), names(me))
+        if(sum(!is.na(me))==1){ ## only intercept specified
+          eval(parse(text=paste0(DESData$distribution.varname[i],
+                                 "<- setType(list(mean=",
+                                 me[1],
+                                 ", variance=",
+                                 cov[1,1],
+                                 "), type =", 
+                                 DESData$distribution.type[i], ")")))  
+        } else {
+          cov <- cov[!is.na(me), !is.na(me)]
+          me <- me[!is.na(me)]
+          eval(parse(text=paste0(DESData$distribution.varname[i],
+                                 "<- setType(list(mean= me, covariance= cov), type =", 
+                                 DESData$distribution.type[i], ")")))  
+        }
+      }
+      
+      if(DESData$distribution.type[i] == "\"distribution for costs\""){
+        eval(parse(text=paste0("mean.",DESData$distribution.varname[i],
+                               " <-", DESData$mean[i])))  
+        eval(parse(text=paste0("variance.", DESData$distribution.varname[i],
+                               " <-", DESData$sd[i]^2)))  
+      }
     }
-  }
-  
-  if(DESData$distribution.type[DESData$varname=="costs.inviteToScreen"] == "\"fixed value for costs\""){
-    v1distributions$costs <- setType(v2$costs, type = "fixed value for costs")
-  }
-  if(DESData$distribution.type[DESData$varname=="costs.inviteToScreen"] == "\"distribution for costs\""){
-    v1distributions$costs <- setType(list(mean = unlist(mean.d.costs), variance = unlist(variance.d.costs)), 
-                                     type = "distribution for costs")
-  }
-  
-  ## If prevalence is NA then set to NULL
-  if(is.na(v2$prevalence)){
-    v2$prevalence <- NULL
-    v1distributions$prevalence <- NULL
-  }
-
-  # print(v0)
-  # print(v1other)
-  # print(v2)
-  # print(v1distributions)
+    
+    if(DESData$distribution.type[DESData$varname=="costs.inviteToScreen"] == "\"fixed value for costs\""){
+      v1distributions$costs <- setType(v2$costs, type = "fixed value for costs")
+    }
+    if(DESData$distribution.type[DESData$varname=="costs.inviteToScreen"] == "\"distribution for costs\""){
+      v1distributions$costs <- setType(list(mean = unlist(mean.d.costs), variance = unlist(variance.d.costs)), 
+                                       type = "distribution for costs")
+    }
+    
+    ## If prevalence is NA then set to NULL
+    if(is.na(v2$prevalence)){
+      v2$prevalence <- NULL
+      v1distributions$prevalence <- NULL
+    }
+    
+    # print(v0)
+    # print(v1other)
+    # print(v2)
+    # print(v1distributions)
+  }  
   
   ## Replace any inputs with user-defined inputs from AAA_DES
   for(l in 1:length(extraInputs)){
@@ -363,6 +370,12 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
 
   if(psa == FALSE) {
     if(selectiveSampling == TRUE){
+      if(v0$returnEventHistories == TRUE){
+        stop("Cannot return event histories if selective sampling is used. 
+  Either turn off selective sampling (selectiveSampling = FALSE)  
+  or set v0$returnEventHistories = FALSE")
+      }
+      
       ## Run model once using point estimates
       res<-processPersonsControlOnly(v0, v1other, v2)
       res.sampled<-processPersonsAboveDiagnosisThreshold(v0, v1other, v2, 
@@ -936,10 +949,6 @@ processPersonsControlOnly <- function(v0, v1other, v2, updateProgress=NULL) {
   }
   ## REMOVED PROCESS BATCH OF PERSONS
   
-  # TODO: if returnMeanQuantities=TRUE and the other two are FALSE, it might 
-  # be better to put the mean quantities in a three-dimensional array straight
-  # away, i.e. use parSapply(..., simplify="array") instead of parLapply. 
-  
   # Get event-histories and person-specific quantities from 
   # resultForEachPerson and put it in result, if required. The lines with 
   # "<-" both get the information for both treatment-groups. 
@@ -1234,15 +1243,6 @@ getTimeAtGivenDiameter <- function(v3, diameter) {
 	(log(diameter) - v3$b0) / v3$b1
 }
 
-
-# Generate time until incidental detection, given that the person is aneurysmal:
-# timeIncidentalDetection <- function(v3, rateOfIncidentalDetection) {
-#   time <- qexp(v3[["rateOfIncidentalDetection"]][1], rate = rateOfIncidentalDetection)
-#   v3[["rateOfIncidentalDetection"]] <- v3[["rateOfIncidentalDetection"]][-1]
-#   ## Now uses propensity generated for pair of individuals         
-# ## rexp(n=1, rate=rateOfIncidentalDetection)
-#   return(list(time = time, v3 = v3))
-# }
 
 # generateIncidentalDetectionTime. This assumes the linear model for log-diameter for each person. 
 generateIncidentalDetectionTime <- function(currentTime, 
@@ -1812,11 +1812,7 @@ getBinaryVariable <- function(varName, v1other, v2, v3, eventTime) {
 		## Use propensity to calculate whether event occurs or not
 		result <- prob > v3[[varName]]
 		
-	# } else if (varName %in% names(v2) && 
-	# 		getType(v2[[varName]]) == "probability" && 
-	# 		varName %in% namesOfProbVarsForSurvivalModel) {
-	# 	result <- rbernoulli(v2[[varName]])
-		
+	
 	} else {
 		cat("\n\nvarName=", varName, "\nv2:\n", sep=""); print(v2); 
 		cat("\nv3:\n"); print(v3)
@@ -2376,7 +2372,7 @@ psa <- function(v0, v1other, v1distributions, v2values) {
 	
 	# If v2values is missing, then create it. 
 	# If it is given, then check it.
-	if (missing(v2values)) {  
+		if (missing(v2values)) {  
 		setAndShowRandomSeed(v0$randomSeed, verbose=TRUE)  # uses set.seed
 		v2values <- replicate(n=v0$numberOfParameterIterations, 
 				expr=generateV2(v1distributions), simplify=FALSE) 
@@ -2390,7 +2386,7 @@ psa <- function(v0, v1other, v1distributions, v2values) {
 		cat("NB v2values has been supplied to psa, so v2 has not been ",
 				"generated by psa.\n", sep="")
 	}
-browser()	
+
 	# Main PSA loop. 
 	if (v0$method == "serial") {
 		setAndShowRandomSeed(v0$randomSeed, verbose=TRUE)
@@ -2485,8 +2481,10 @@ generateV2 <- function(v1distributions) {
 		
 		if (type == "fixed value") {
 			v2element <- v1element
-			
-		} else if (type == "beta pars for probability") {
+		} else if (type == "fixed value for qaly") {
+		  v2element <- v1element
+		  attr(v2element, "type") <- "qaly"
+		}	else if (type == "beta pars for probability") {
 			v2element <- myRbeta(n=1, 
 					shape1=v1element$alpha, shape2=v1element$beta)
 			attr(v2element, "type") <- "probability"
@@ -2652,7 +2650,7 @@ psaAboveDiagnosisThreshold <- function(v0, v1other, v1distributions, v2values,th
 	if ("generateCensoringTime" %in% names(v0))
 		cat("Censoring is being used, so life-years etc. will be calculated",
 				"up to censoring times.\n")
-	
+
 	# If v2values is missing, then create it. 
 	# If it is given, then check it.
 	if (missing(v2values)) {  
@@ -2669,7 +2667,7 @@ psaAboveDiagnosisThreshold <- function(v0, v1other, v1distributions, v2values,th
 		cat("NB v2values has been supplied to psa, so v2 has not been ",
 				"generated by psa.\n", sep="")
 	}
-	
+
 	# Main PSA loop. 
 	if (v0$method == "serial") {
 		setAndShowRandomSeed(v0$randomSeed, verbose=TRUE)
@@ -3468,7 +3466,7 @@ checkV1distributions <- function(v1distributions) {
 			print(v1element)
 			stop("v1distributions$", v1elementName, " is illegal in some way")
 		}
-		if (type == "fixed value") {
+		if (type == "fixed value" | type == "fixed value for qaly") {
 			if (is.na(v1element) || length(v1element) == 0)
 				raiseV1TypeRelatedError(v1elementName)
 			
