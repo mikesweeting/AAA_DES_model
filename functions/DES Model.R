@@ -431,6 +431,9 @@ processPersons <- function(v0, v1other, v2) {
 	# Set unspecified elements of v0 to default values, if necessary. 
 	v0 <- setUnspecifiedElementsOfv0(v0)
 	
+	# Set unspecified elements of v1other to default values
+	v1other <- setUnspecifiedElementsOfv1other(v1other)
+	
 	# Check the arguments.
 	checkArgs(v0=v0, v1other=v1other, v2=v2)
 	
@@ -584,6 +587,9 @@ processPersonsAboveDiagnosisThreshold <- function(v0, v1other, v2,
 	
   # Set unspecified elements of v0 to default values, if necessary. 
   v0 <- setUnspecifiedElementsOfv0(v0)
+  
+  # Set unspecified elements of v1other to default values
+  v1other <- setUnspecifiedElementsOfv1other(v1other)
   
 	## Weighting of baseline distribution outside of processPersons 
 	# Change the prevalence, if v2$prevalence exists.
@@ -816,6 +822,9 @@ processPersonsControlOnly <- function(v0, v1other, v2, updateProgress=NULL) {
   
   # Set unspecified elements of v0 to default values, if necessary. 
   v0 <- setUnspecifiedElementsOfv0(v0)
+  
+  # Set unspecified elements of v1other to default values
+  v1other <- setUnspecifiedElementsOfv1other(v1other)
   
   # Check the arguments.
   checkArgs(v0=v0, v1other=v1other, v2=v2)
@@ -1375,7 +1384,7 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 	scheduledEvents["rupture"] <- v3$ruptureTime
 	scheduledEvents["nonAaaDeath"] <- v3$nonAaaDeathTime
 	if (treatmentGroup=="screening") 
-		scheduledEvents["inviteToScreen"] <- 0
+		scheduledEvents["inviteToScreen"] <- v1other$waitingTimeToInvitation
 	if (treatmentGroup=="noScreening"){
 	  gID <- generateIncidentalDetectionTime(0, 
 	                                  v1other$thresholdForIncidentalDetection, v3, 
@@ -1409,12 +1418,12 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 		# Update scheduledEvents as appropriate based on what eventType is.
 		if (eventType=="inviteToScreen") {
 			if (v3$probOfRequireReinvitation) {
-				eventHistory <- addEvent(eventHistory, "requireReinvitation", 0)
+				eventHistory <- addEvent(eventHistory, "requireReinvitation", eventTime)
 			} 
 			if (v3$probOfAttendScreen) {
-				scheduledEvents["screen"] <- 0   # ("screen" means they attend)
+				scheduledEvents["screen"] <- eventTime   # ("screen" means they attend)
 			} else {
-				eventHistory <- addEvent(eventHistory, "failToAttendScreen", 0)
+				eventHistory <- addEvent(eventHistory, "failToAttendScreen", eventTime)
 				gID <- generateIncidentalDetectionTime(eventTime, 
 				                                       v1other$thresholdForIncidentalDetection, v3, 
 				                                       v2$rateOfIncidentalDetection)
@@ -2348,6 +2357,9 @@ psa <- function(v0, v1other, v1distributions, v2values) {
 	v0$showEventHistories <- FALSE
 	v0$verbose <- FALSE 
 	
+	# Set unspecified elements of v1other to default values
+	v1other <- setUnspecifiedElementsOfv1other(v1other)
+	
 	# Check the arguments.
 	checkArgs(v0=v0, v1other=v1other, v1distributions=v1distributions)
 	
@@ -2628,6 +2640,9 @@ psaAboveDiagnosisThreshold <- function(v0, v1other, v1distributions, v2values,th
 	v0$returnAllPersonsQuantities <- FALSE
 	v0$showEventHistories <- FALSE
 	v0$verbose <- FALSE  # prevent processPersons from being verbose
+	
+	# Set unspecified elements of v1other to default values
+	v1other <- setUnspecifiedElementsOfv1other(v1other)
 	
 	# Check the arguments.
 	checkArgs(v0=v0, v1other=v1other, v1distributions=v1distributions)
@@ -3161,6 +3176,21 @@ setUnspecifiedElementsOfv0 <- function(v0) {
 	if (v0$method != "serial" && !("numberOfProcesses" %in% names(v0)))
 		v0$numberOfProcesses <- getRecommendedNumberOfProcesses()
 	return(v0)
+}
+
+# Set elements of v1other to default values, if they have not already been specified in v1other. 
+setUnspecifiedElementsOfv1other <- function(v1other) {
+  # Create a list that contains the default values. 
+  defaults <- list(
+    waitingTimeToInvitation = 0
+  )
+  for (i in 1:length(defaults)) {
+    varName <- names(defaults)[i]
+    if (!(varName %in% names(v1other)))
+      v1other[[varName]] <- defaults[[i]]
+  }
+
+  return(v1other)
 }
 
 # Get the recommended number of processes. 
