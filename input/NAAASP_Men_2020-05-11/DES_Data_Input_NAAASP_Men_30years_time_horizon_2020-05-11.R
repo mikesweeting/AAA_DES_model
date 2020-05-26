@@ -19,7 +19,7 @@ if (!exists("v2")) v2 <- compactList()
 
 v1other$postSurgeryInitialPeriod <- 30 / 365.25  # = 0.08213552
 
-v1other$startAge <- 65
+# v1other$startAge <- 65 - This is now specified in personData file as fed as an argument to processPersons or AAA_DES
 
 v0$generateCensoringTime <- function() { 30.000001 }
 
@@ -381,7 +381,7 @@ qol.chol <- as.matrix(read.csv("input/NAAASP_Men_2020-05-11/QOL_Cholesky.csv", h
 rownames(qol.chol) <- colnames(qol.chol) <- names(qol.coef)
 ## Assign these to v1other inputs
 ## Using deprivation quintile 3 (median group)
-v1other$qalyFactorBoundaries <- 1:35 ## years after age 65 that calculate new EQ5D
+v1other$qalyFactorAgeBoundaries <- 65+1:35 ## years after age 65 that calculate new EQ5D
 qol.ages <- 65:100
 X <- cbind(0, 1, 0, 0, 65:100, (65:100)^2, 0, 1) ## Design matrix
 v2$qalyFactors <- setType(c(X %*% t(t(qol.coef))), "qaly")

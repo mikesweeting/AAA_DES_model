@@ -41,40 +41,54 @@ v0$method <- "parallel" ## Use v0$method = "parallel" to fit the DES using paral
 ## For each pair (clone), one is assigned to the Invitation to Screening arm, one is assigned to the No Invitation to Screening arm
 n <- 1e4 ## Ideally, this should be large (~10 million) and run on a supercomputer. For this example, we run for only 10,000 patient-pairs
 
+## Persons characteristics data.frame
+## This should contain the distribution of ages at invitation to screening (in the column startAge) and probability weights (in the column prob)
+## If prob is missing then the DES will sample with replacement from every row of the data.frame with equal probability
+## If everyone is aged 65 at invitation to screening then we just need to specify the following data.frame
+## In time, further patient characteristics will be incorporated within this file (such as aortaSize). This will allow, for example an age by aortaSize joint distribution to be sampled
+personData <- data.frame(startAge = 65)
+
 ## We now run the model using the AAA_DES function
 ## This by default does selectiveSampling (argument selectiveSampling = TRUE). This means that it only samples men above the diagnosis threshold
 ## This is more efficient for calculating mean QALYs and Costs but does mean that eventHistories cannot be returned
 
 ## Model A. This model runs the NAAASP model for men under surveillance intervals (1 year 3.0-4.4, 3 months 4.5-5.4)
 ## Running the model using the dataFile input
-resultA <- AAA_DES(dataFile, n = n, extraInputs = list(v0 = v0))
+resultA <- AAA_DES(dataFile, n = n, extraInputs = list(v0 = v0), personData = personData)
 resultA$meanQuantities
 
 ## If we specify both dataFile and extraInputs as inputs then extraInputs overwrites anything in the dataFile
-resultA <- AAA_DES(dataFile, n = n, extraInputs = list(v0 = v0, v1other = v1other, v1distributions = v1distributions, v2 = v2))
+resultA <- AAA_DES(dataFile, n = n, extraInputs = list(v0 = v0, v1other = v1other, v1distributions = v1distributions, v2 = v2), personData = personData)
 resultA$meanQuantities
 
 ## If we wish to run the model without dataFile, input dataFile = NULL
-resultA <- AAA_DES(dataFile = NULL, n = n, extraInputs = list(v0 = v0, v1other = v1other, v1distributions = v1distributions, v2 = v2))
+resultA <- AAA_DES(dataFile = NULL, n = n, extraInputs = list(v0 = v0, v1other = v1other, v1distributions = v1distributions, v2 = v2), personData = personData)
 resultA$meanQuantities
 
 ## To get event histories for all invited men, but without selective sampling (resulting in more Monte Carlo error in incremental costs and effects)
 v0$returnEventHistories <- TRUE
 resultA.eventHistories <- AAA_DES(dataFile = NULL, n = n, extraInputs = list(v0 = v0, v1other = v1other, v1distributions = v1distributions, v2 = v2),
-                                  selectiveSampling = FALSE)
+                                  selectiveSampling = FALSE, personData = personData)
 resultA.eventHistories$meanQuantities
 ## Listing the first 10 patient-pair event histories
 resultA.eventHistories$eventHistories[1:10]
+
+## AAA_DES is a wrapper for the function processPersons and usually calls it twice, first to get absolute effects for the control group, then to get incremental effects (between invited and control)
+## If we are only interested in the incremental effects we can run the model faster by specifying incrementalOnly = TRUE
+resultA <- AAA_DES(dataFile = NULL, n = n, extraInputs = list(v0 = v0, v1other = v1other, v1distributions = v1distributions, v2 = v2), 
+                   personData = personData, incrementalOnly = TRUE)
+resultA$meanQuantities
+
 
 ## Model B. Let's change the surveillance intervals to the following (2 year 3.0-4.4, 6 months 4.5-5.4)
 v0$returnEventHistories <- FALSE
 v1other$aortaDiameterThresholds <- c(3, 4.5, 5.5)
 v1other$monitoringIntervals <- c(2, 2, 0.5)
-resultB <- AAA_DES(dataFile = NULL, n = n, extraInputs = list(v0 = v0, v1other = v1other, v1distributions = v1distributions, v2 = v2))
+resultB <- AAA_DES(dataFile = NULL, n = n, extraInputs = list(v0 = v0, v1other = v1other, v1distributions = v1distributions, v2 = v2), personData=personData)
 resultB$meanQuantities
 
 
 ## Doing 10 PSA runs of model B (just using 1000 patient-pairs - NOTE, this should be much larger in practice)
 resultB.psa <- AAA_DES(dataFile = NULL, n = 1000, nPSA = 10, extraInputs = list(v0 = v0, v1other = v1other, v1distributions = v1distributions, v2 = v2),
-                                                       psa = TRUE)
+                                                       psa = TRUE, personData = personData)
 resultB.psa$psaQuantities

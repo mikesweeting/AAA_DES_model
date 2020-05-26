@@ -46,8 +46,9 @@
 ## n -- Number of pairs of individuals to be run in DES (defaults to 10000)
 ## nPSA -- Number of PSA iterations (defaults to 100). Only used if psa = TRUE
 ## selectiveSampling -- Use selective sampling to estimate incremental effects? This uses processControlOnly to first get absolute numbers for control group
+## incrementalOnly -- Use the with selectiveSampling = TRUE to only estimate incremental effects. This saves time by not executing processControlOnly
 ## extraInputs -- A list of any elements of v0, v1other, v1distributions and v2 that the user wishes to change from the R command line
-
+## personData -- Person characteristics at baseline. Samples with replacement from the data.frame (possibly weighted sampling using prob as a column)
 
 # 1a) processPersons 
 # 1b) processPersonsAboveDiagnosisThreshold
@@ -71,8 +72,12 @@
 ################################################################################
 # AAA_DES
 AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampling = TRUE,
-                    extraInputs = list(v0 = list(), v1other = list(), v2 = list(), v1distributions = list())){
-  v0 <- compactList() 
+                    incrementalOnly = FALSE, extraInputs = list(v0 = list(), v1other = list(), v2 = list(), v1distributions = list()), 
+                    personData = NULL){
+  
+  # Set unspecified elements of v0 to default values, if necessary. 
+  v0 <- setUnspecifiedElementsOfv0(v0)
+  
   v1distributions <- compactList() 
   v1other <- compactList()
   v2 <- compactList()
@@ -81,9 +86,28 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
   v0$numberOfPersons <- n
   v0$numberOfParameterIterations <- nPSA
   
+  ## Only one of v1other$startAge and personData should be specified
+  if(!is.null(v1other$startAge)) warning("v1other$startAge is deprecated. Please specify age distribution in personData instead")
+  if(!is.null(v1other$startAge) & !is.null(personData)) stop("Only one of v1other$startAge and personData can be specified")
+  ## If v1other exists then assign is to personData$startAge 
+  if(!is.null(v1other$startAge)){
+    personData <- data.frame(startAge = v1other$startAge)
+    v1other$startAge <- NULL
+  }
+  ## If prob (probability weighting) does not exist in personData then assign it the value 1
+  if(is.null(personData$prob)){
+    personData$prob <- 1
+  }
+  
   ## Input Data for the DES model
-  require(readxl)
-  require(tibble)
+  if(!require(readxl)){
+    install.packages("readxl")
+  }
+  library(readxl)
+  if(!require(tibble)){
+    install.packages("tibble")
+  }
+  library(tibble)
   
   ## Main Data Items
   if(!is.null(dataFile)){
@@ -167,14 +191,8 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
     
     ## Assign QoL utilities
     # Overall QoL / utilities
-
-    qalys <- createQalyFactors(
-      startAge=v1other$startAge,
-      qalyFactorBoundariesAsAges = qalyFactorBoundariesAsAges,
-      qalyFactorsForAges = qalyFactorsForAges
-    )
-    v2$qalyFactors <- setType(qalys$qalyFactors, "qaly")
-    v1other$qalyFactorBoundaries <- qalys$qalyFactorBoundaries
+    v2$qalyFactors <- setType(v2$qalyFactors, "qaly")
+    
     
     ## Assign growth and rupture rate values
     for(i in 1:dim(growthData)[1]){
@@ -375,24 +393,31 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
   Either turn off selective sampling (selectiveSampling = FALSE)  
   or set v0$returnEventHistories = FALSE")
       }
+   
+      res.sampled<-processPersonsAboveDiagnosisThreshold(v0, v1other, v2, 
+                                                         threshold=v1other$aortaDiameterThresholds[1], personData = personData)
       
       ## Run model once using point estimates
-      res<-processPersonsControlOnly(v0, v1other, v2)
-      res.sampled<-processPersonsAboveDiagnosisThreshold(v0, v1other, v2, 
-                                                         threshold=v1other$aortaDiameterThresholds[1])
+      if(incrementalOnly == FALSE){
+        res<- processPersonsControlOnly(v0, v1other, v2, personData = personData)
+      } else {
+        res <- list()
+        res$meanQuantities <- matrix(replace(res.sampled$incrementalMeanQuantities, T, NA), nrow=1, dimnames = list("noScreening",names(res.sampled$incrementalMeanQuantities) ))
+      }
+      
       result <- list(resultsControl = res, resultsIncremental = res.sampled)
       result$meanQuantities <- rbind(res$meanQuantities, screening = NA, difference = NA)
       result$meanQuantities["screening",] <- res$meanQuantities["noScreening",] + res.sampled$incrementalMeanQuantities
       result$meanQuantities["difference",] <- res.sampled$incrementalMeanQuantities
     } else {
-      result <- processPersons(v0, v1other, v2)  
+      result <- processPersons(v0, v1other, v2, personData=personData)  
     }
     return(result)
   } else {
     ## Run PSA
     #result <- psa(v0, v1other, v1distributions)
     result <- psaAboveDiagnosisThreshold(v0, v1other, v1distributions, 
-                               threshold = v1other$aortaDiameterThresholds[1])
+                               threshold = v1other$aortaDiameterThresholds[1], personData = personData)
     return(result)
   }
 }
@@ -423,7 +448,7 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
 #   stored all these quantities in a 3D array, called "personsQuantities",
 #   instead of a list.) 
 ################################################################################
-processPersons <- function(v0, v1other, v2) {
+processPersons <- function(v0, v1other, v2, personData=NULL) {
 	
 	
 	suppressWarnings(suppressMessages(require(doParallel)))
@@ -435,8 +460,26 @@ processPersons <- function(v0, v1other, v2) {
 	v1other <- setUnspecifiedElementsOfv1other(v1other)
 	
 	# Check the arguments.
-	checkArgs(v0=v0, v1other=v1other, v2=v2)
+	checkArgs(v0=v0, v1other=v1other, v2=v2, personData=personData)
+	if(!is.null(v1other$qalyFactorBoundaries)){
+	  warning("Assuming startAge is 65 for everyone and calculating qalyFactorAgeBoundaries for you")
+	  v1other$qalyFactorAgeBoundaries <- 65 + v1other$qalyFactorBoundaries
+	  v1other$qalyFactorBoundaries <- NULL
+	}
 	
+	## Only one of v1other$startAge and personData should be specified
+	if(!is.null(v1other$startAge)) warning("v1other$startAge is deprecated. Please specify age distribution in personData instead")
+	if(!is.null(v1other$startAge) & !is.null(personData)) stop("Only one of v1other$startAge and personData can be specified")
+	## If v1other exists then assign is to personData$startAge 
+	if(!is.null(v1other$startAge)){
+	  personData <- data.frame(startAge = v1other$startAge)
+    v1other$startAge <- NULL
+	}
+	## If prob (probability weighting) does not exist in personData then assign it the value 1
+	if(is.null(personData$prob)){
+	  personData$prob <- 1
+	}
+	  
 	# Display v0, v1other, and v2
 	if (v0$verbose) {
 		cat("Running processPersons on ", Sys.info()["nodename"], 
@@ -452,15 +495,19 @@ processPersons <- function(v0, v1other, v2) {
 		print(v1other)
 		cat("########## v2 ##########\n")
 		print(v2)
+		cat("########## personData ##############\n")
+		print(personData)
 		cat("########################\n\n")
 	}
 	
 	# Create v1other$nonAaaSurvProbs or nonAaaMortalityRates. 
+	## MS: 24/05/20. Changing v1other$nonAaaSurvProbs to be a data.frame with age and probabilities
+	## MS: 24/05/20. This will allow individuals to have different starting ages
 	if (v1other$nonAaaDeathMethod == "mass") {
 		v1other$nonAaaSurvProbs <- getMassSurvivalProbabilities()
 	} else if (v1other$nonAaaDeathMethod == "onsIntegerStart") { 
 		v1other$nonAaaSurvProbs <- convertMortalityRatesToSurvProbs(
-				v1other$startAge, v1other$nonAaaMortalityRatesFileName)
+				min(personData$startAge), v1other$nonAaaMortalityRatesFileName)
 	} else if (v1other$nonAaaDeathMethod == "onsNonintegerStart") {
 		v1other$nonAaaMortalityRates <- 
 				readMortalityRatesFromFile(v1other$nonAaaMortalityRatesFileName)
@@ -518,7 +565,7 @@ processPersons <- function(v0, v1other, v2) {
 	if (v0$method == "serial") {
 		setAndShowRandomSeed(v0$randomSeed, verbose=v0$verbose)
 		resultForEachPerson <- lapply(X=1:v0$numberOfPersons, 
-				FUN=processOnePair, v0, v1other, v2)
+				FUN=processOnePair, v0, v1other, v2, personData)
 		
 	} else if (v0$method == "parallel") {
 		cluster <- makeCluster(v0$numberOfProcesses)  
@@ -526,7 +573,7 @@ processPersons <- function(v0, v1other, v2) {
 		setAndShowRandomSeed(randomSeed=v0$randomSeed, cluster=cluster, 
 				verbose=v0$verbose)
 		resultForEachPerson <- parLapply(cl=cluster, X=1:v0$numberOfPersons,
-				fun=processOnePair, v0, v1other, v2)
+				fun=processOnePair, v0, v1other, v2, personData)
 		stopCluster(cluster) 
 		
 	} else if (v0$method == "foreach") {
@@ -535,7 +582,7 @@ processPersons <- function(v0, v1other, v2) {
 		registerDoParallel(cores=v0$numberOfProcesses)
 		resultForEachPerson <- foreach(personNumber=1:v0$numberOfPersons,
 				.export=getAllFunctionsAndStringsInGlobalEnv()) %dopar% {
-			processOnePair(personNumber, v0, v1other, v2) 
+			processOnePair(personNumber, v0, v1other, v2, personData) 
 		}
 		stopImplicitCluster()  
 		
@@ -583,7 +630,7 @@ processPersons <- function(v0, v1other, v2) {
 # to get total numbers of events in the population but can be used for PSA analyses
 ################################################################################
 processPersonsAboveDiagnosisThreshold <- function(v0, v1other, v2, 
-		threshold=3.0) {
+		threshold=3.0, personData) {
 	
   # Set unspecified elements of v0 to default values, if necessary. 
   v0 <- setUnspecifiedElementsOfv0(v0)
@@ -623,7 +670,7 @@ processPersonsAboveDiagnosisThreshold <- function(v0, v1other, v2,
 	v1otherOver$baselineDiameters$weight[v1bd$size < threshold] <- 0
 	
 	# Run processPersons just once based on distribution of diameters greater or equal to the threshold.
-	resultOver <- processPersons(v0over, v1otherOver, v2)
+	resultOver <- processPersons(v0over, v1otherOver, v2, personData = personData)
 	# Obtain incremental effects and costs for this population, weighted by the 
 	# proportion of people >= diagnosis threshold. 
 	result<-list(incrementalMeanQuantities=(1-trueProportionBelowThreshold)*
@@ -680,7 +727,7 @@ processPersonsAboveDiagnosisThreshold <- function(v0, v1other, v2,
 #   result$eventHistories$noScreening
 # (the last two only if v0$returnEventHistories is TRUE). 
 ################################################################################
-processOnePair <- function(personNumber, v0, v1other, v2) {
+processOnePair <- function(personNumber, v0, v1other, v2, personData) {
 
 	# Check the arguments.
 	if (!("namesOfQuantities" %in% names(v0)))
@@ -704,14 +751,19 @@ processOnePair <- function(personNumber, v0, v1other, v2) {
 			sapply(v0$treatmentGroups, function(x) NULL)
 	
 	# Generate characteristics and natural events. 
+	# First sample a row from the data file
+	dataItem <- personData[sample.int(dim(personData)[1], 1, prob=personData$prob),,drop=F]
+	#dataItem <- personData[1,,drop=F]
+
 	aortaGrowthParameters <- generatePersonAortaParameters(v1other, v2)
-	v3 <- compactList(
-		# Characteristics:
+	# Patient characteristics from dataItem
+	v3 <- c(as.list(dataItem), compactList(
+	  # Characteristics:
 		b0=aortaGrowthParameters$b0, 
 		b1=aortaGrowthParameters$b1,
 		# Natural events:
 		ruptureTime=aortaGrowthParameters$ruptureTime,
-		nonAaaDeathTime=generateTimeTillNonAaaDeath(v0, v1other),
+		nonAaaDeathTime=generateTimeTillNonAaaDeath(v0, v1other, dataItem$startAge),
 
 		# Initial diameter as measured:
 		initialAortaSizeAsMeasured=
@@ -720,7 +772,7 @@ processOnePair <- function(personNumber, v0, v1other, v2) {
 		# A large vector of propensities (probabilities) to be used each time an observed AAA size is required
 		# This reduces MC error when comparing the two treatment groups (pairs are more closely cloned)
 		aortaSize = setType(runif(300), "propensity")
-	)
+	))
 	
 	# Generate boolean variables (v3) for v2 elements of type "probability". 
 	for (elementName in sort(names(v2))) {
@@ -796,7 +848,7 @@ processOnePair <- function(personNumber, v0, v1other, v2) {
 		# From eventHistory, calculate the health-economic quantities.
 		result$personQuantities[[treatmentGroup]] <- 
 				calculateHealthEconomicQuantities(
-				eventHistory, v0$namesOfQuantities, v2$costs, v1other, v2)
+				eventHistory, v0$namesOfQuantities, v2$costs, v1other, v2, v3)
 	}
 	
 	return(result)
@@ -807,7 +859,7 @@ processOnePair <- function(personNumber, v0, v1other, v2) {
 # processPersonsControlOnly - generate a set of persons for CONTROL GROUP ONLY and analyze them. 
 
 ################################################################################
-processPersonsControlOnly <- function(v0, v1other, v2, updateProgress=NULL) {
+processPersonsControlOnly <- function(v0, v1other, v2, updateProgress=NULL, personData=NULL) {
   
   
   cat("processPersons\n")
@@ -827,7 +879,25 @@ processPersonsControlOnly <- function(v0, v1other, v2, updateProgress=NULL) {
   v1other <- setUnspecifiedElementsOfv1other(v1other)
   
   # Check the arguments.
-  checkArgs(v0=v0, v1other=v1other, v2=v2)
+  checkArgs(v0=v0, v1other=v1other, v2=v2, personData=personData)
+  if(!is.null(v1other$qalyFactorBoundaries)){
+    warning("Assuming startAge is 65 for everyone and calculating qalyFactorAgeBoundaries for you")
+    v1other$qalyFactorAgeBoundaries <- 65 + v1other$qalyFactorBoundaries
+    v1other$qalyFactorBoundaries <- NULL
+  }
+  
+  ## Only one of v1other$startAge and personData should be specified
+  if(!is.null(v1other$startAge)) warning("v1other$startAge is deprecated. Please specify age distribution in personData instead")
+  if(!is.null(v1other$startAge) & !is.null(personData)) stop("Only one of v1other$startAge and personData can be specified")
+  ## If v1other exists then assign is to personData$startAge 
+  if(!is.null(v1other$startAge)){
+    personData <- data.frame(startAge = v1other$startAge)
+    v1other$startAge <- NULL
+  }
+  ## If prob (probability weighting) does not exist in personData then assign it the value 1
+  if(is.null(personData$prob)){
+    personData$prob <- 1
+  }
   
   # Display some messages. 
   if (v0$verbose) {
@@ -847,18 +917,20 @@ processPersonsControlOnly <- function(v0, v1other, v2, updateProgress=NULL) {
     print(v1other)
     cat("########## v2 ##########\n")
     print(v2)
+    cat("########## personData ##########\n")
+    print(personData)
     cat("########################\n\n")
   }
   
   # Create v1other$nonAaaSurvProbs or nonAaaMortalityRates. 
   # (See also checkArgs.R.)
   if (v1other$nonAaaDeathMethod == "mass") {
-    v1other$nonAaaSurvProbs <- getMassSurvivalProbabilities()
+       v1other$nonAaaSurvProbs <- getMassSurvivalProbabilities()
   } else if (v1other$nonAaaDeathMethod == "onsIntegerStart") { 
     v1other$nonAaaSurvProbs <- convertMortalityRatesToSurvProbs(
-      v1other$startAge, v1other$nonAaaMortalityRatesFileName)
+      min(personData$startAge), v1other$nonAaaMortalityRatesFileName)
   } else if (v1other$nonAaaDeathMethod == "onsNonintegerStart") {
-    v1other$nonAaaMortalityRates <- 
+        v1other$nonAaaMortalityRates <- 
       readMortalityRatesFromFile(v1other$nonAaaMortalityRatesFileName)
   } else {
     stop("v1other$nonAaaDeathMethod=", v1other$nonAaaDeathMethod, 
@@ -929,7 +1001,7 @@ processPersonsControlOnly <- function(v0, v1other, v2, updateProgress=NULL) {
     setAndShowRandomSeed(v0$randomSeed, verbose=v0$verbose)
     v0$treatmentGroups <- "noScreening"
     resultForEachPerson <- lapply(X=1:v0$numberOfPersons, 
-                                  FUN=processOnePair, v0, v1other, v2)
+                                  FUN=processOnePair, v0, v1other, v2, personData)
     
   } else if (v0$method == "parallel") {
     # Do it using parLapply. 
@@ -939,7 +1011,7 @@ processPersonsControlOnly <- function(v0, v1other, v2, updateProgress=NULL) {
     setAndShowRandomSeed(randomSeed=v0$randomSeed, cluster=cluster, 
                          verbose=v0$verbose)
     resultForEachPerson <- parLapply(cl=cluster, X=1:v0$numberOfPersons,
-                                     fun=processOnePair, v0, v1other, v2)
+                                     fun=processOnePair, v0, v1other, v2, personData)
     stopCluster(cluster) 
     
   } else if (v0$method == "foreach") {
@@ -950,7 +1022,7 @@ processPersonsControlOnly <- function(v0, v1other, v2, updateProgress=NULL) {
     registerDoParallel(cores=v0$numberOfProcesses)
     resultForEachPerson <- foreach(personNumber=1:v0$numberOfPersons,
                                    .export=getAllFunctionsAndStringsInGlobalEnv()) %dopar% {
-                                     processOnePair(personNumber, v0, v1other, v2) 
+                                     processOnePair(personNumber, v0, v1other, v2, personData) 
                                    }
     stopImplicitCluster()  # (seems unreliable)	
   }  else {
@@ -1801,7 +1873,7 @@ getBinaryVariable <- function(varName, v1other, v2, v3, eventTime) {
 		for (covariateName in names(covariates)) {
 		  ## NEED TO ENSURE v3 IS ASSIGNED BACK TO GENERATEEVENTHISTORY
 			covariates[covariateName] <- switch(covariateName,
-					age = v1other$startAge + eventTime - 80,
+					age = v3$startAge + eventTime - 80,
 					aortaSize = getAortaMeasurement(v3, eventTime, 
 						v2$ultrasoundMeasurementErrorSD, method="ultrasound", propensity=v3[["aortaSize"]][1]) - 6.0,
 					stop("in v2$", varName, ", the name \"", covariateName, 
@@ -2196,17 +2268,21 @@ print.compactList <- function(x, ...) {
 # generateTimeTillNonAaaDeath, that is used whichever model is used.
 ################################################################################
 # A single function for any non-AAA death model. 
-generateTimeTillNonAaaDeath <- function(v0, v1other) {
-	if (v1other$nonAaaDeathMethod == "mass") {
+generateTimeTillNonAaaDeath <- function(v0, v1other, startAge) {
+	## Calculate conditional survival probabilties given patient's age
+  ## Probabilities are survival up to the end of that year of age
+  nonAaaSurvProbs <- v1other$nonAaaSurvProbs[v1other$nonAaaSurvProbs$age >= startAge, 2] / min(v1other$nonAaaSurvProbs[v1other$nonAaaSurvProbs$age == startAge-1, 2], 1, na.rm = T)
+  
+  if (v1other$nonAaaDeathMethod == "mass") {
 		return(generateTimeTillNonAaaDeathFromSurvProbs(
-				v1other$nonAaaSurvProbs, 0.25))
+				nonAaaSurvProbs, 0.25))
 		
 	} else if (v1other$nonAaaDeathMethod == "onsIntegerStart") { 
-		return(generateTimeTillNonAaaDeathFromSurvProbs(
-				v1other$nonAaaSurvProbs, 1))
+	  return(generateTimeTillNonAaaDeathFromSurvProbs(
+				nonAaaSurvProbs, 1))
 		
 	} else if (v1other$nonAaaDeathMethod == "onsNonintegerStart") {
-		return(generateTimeTillNonAaaDeathWithNonIntegerStartAge(
+	 	return(generateTimeTillNonAaaDeathWithNonIntegerStartAge(
 				v1other$nonAaaMortalityRates, v0$generateAgeAtBaseline()))
 		
 	} else {
@@ -2229,7 +2305,8 @@ getMassSurvivalProbabilities <- function(fileName=file.path("input/SWAN",
 # generateTimeTillNonAaaDeathFromSurvProbs generates a non-AAA death time
 # from a vector of survival probabilities. 
 generateTimeTillNonAaaDeathFromSurvProbs <- 
-		function(survivalProbs, periodLength) {
+		function(survivalProbs, periodLength, startAge) {
+		 
 	# Check that the arguments are legal. 
 	if (!is.vector(survivalProbs) || !is.numeric(survivalProbs) || 
 			!identical(survivalProbs, sort(survivalProbs, decreasing=TRUE)) ||
@@ -2307,7 +2384,7 @@ generateTimeTillNonAaaDeathWithNonIntegerStartAge <-
 # A simpler function for use with ONS-style data that assumes that 
 # the same start age and that age is an integer. 
 convertMortalityRatesToSurvProbs <- function(startAge, fileName) {
-	## If fileName is already a data.frame then do not read.csv, otherwise use read.csv
+  	## If fileName is already a data.frame then do not read.csv, otherwise use read.csv
   if(is.data.frame(fileName)){
     mortalityRates <- fileName
   } else {
@@ -2332,7 +2409,9 @@ convertMortalityRatesToSurvProbs <- function(startAge, fileName) {
 				(1 - mortalityRates[i, 1])
 		survivalProbs <- c(survivalProbs, nextSurvivalProb)
 	}
-	return(survivalProbs)
+	ages <- as.numeric(rownames(mortalityRates))
+	data <- data.frame(age = ages[ages>=startAge], survivalProbs = survivalProbs)
+	return(data)
 }
 
 ################################################################################
@@ -2347,7 +2426,7 @@ convertMortalityRatesToSurvProbs <- function(startAge, fileName) {
 # lists, each of which can be used as a specific value of v2 (i.e. a specific 
 # set of global uncertain parameters). 
 ################################################################################
-psa <- function(v0, v1other, v1distributions, v2values) {
+psa <- function(v0, v1other, v1distributions, v2values, personData=NULL) {
 	
 	# Set elements of v0 as needed for PSA. 
 	v0 <- setUnspecifiedElementsOfv0(v0)  
@@ -2361,7 +2440,12 @@ psa <- function(v0, v1other, v1distributions, v2values) {
 	v1other <- setUnspecifiedElementsOfv1other(v1other)
 	
 	# Check the arguments.
-	checkArgs(v0=v0, v1other=v1other, v1distributions=v1distributions)
+	checkArgs(v0=v0, v1other=v1other, v1distributions=v1distributions, personData=personData)
+	if(!is.null(v1other$qalyFactorBoundaries)){
+	  warning("Assuming startAge is 65 for everyone and calculating qalyFactorAgeBoundaries for you")
+	  v1other$qalyFactorAgeBoundaries <- 65 + v1other$qalyFactorBoundaries
+	  v1other$qalyFactorBoundaries <- NULL
+	}
 	
 	# Display messages, settings, parameters, etc.
 	cat("Running psa on ", Sys.info()["nodename"], " with:\n  ", 
@@ -2374,6 +2458,8 @@ psa <- function(v0, v1other, v1distributions, v2values) {
 	print(v1other)
 	cat("########## v1distributions ##########\n")
 	print(v1distributions)
+	cat("########## personData ##########\n")
+	print(personData)
 	cat("########################\n\n")
 	if (v0$returnEventHistories)  
 		cat("In psa, v0$returnEventHistories is TRUE, so this will take a ",
@@ -2404,7 +2490,7 @@ psa <- function(v0, v1other, v1distributions, v2values) {
 		setAndShowRandomSeed(v0$randomSeed, verbose=TRUE)
 		v0$randomSeed <- NULL  
 		resultOfApply <- lapply(X=1:v0$numberOfParameterIterations, 
-				FUN=onePsaIteration, v0, v1other, v2values)
+				FUN=onePsaIteration, v0, v1other, v2values, personData)
 	} else if (v0$method == "parallel") {
 		# Do PSA in parallel and processPersons serially. 
 	  v0$method <- "serial" 
@@ -2416,7 +2502,7 @@ psa <- function(v0, v1other, v1distributions, v2values) {
 		v0$randomSeed <- NULL  
 		resultOfApply <- parLapply(cl=cluster, 
 				X=1:v0$numberOfParameterIterations, fun=onePsaIteration, v0, 
-				v1other, v2values)
+				v1other, v2values, personData)
 		stopCluster(cluster) 
 	} else if (v0$method == "foreach" || v0$method == "parallelBatches") {
 		stop("v0$method=", v0$method, " has not been implemented for psa")
@@ -2453,8 +2539,9 @@ psa <- function(v0, v1other, v1distributions, v2values) {
 	return(result)
 }
 
+
 onePsaIteration <- function(psaIterationNumber, v0, v1other, 
-		v2values) {
+		v2values, personData) {
   cat(paste0("PSA iteration ", psaIterationNumber, "\n"))
   
 	# Get v2, the values of the uncertain global variables, and check it.
@@ -2468,7 +2555,7 @@ onePsaIteration <- function(psaIterationNumber, v0, v1other,
 		stop("v2 must contain probOfNonvisualization (and many other elements)")
 	
 	# Create and analyze the persons, and return what is needed.
-	processPersonsResult <- processPersons(v0, v1other, v2)
+  processPersonsResult <- processPersons(v0, v1other, v2, personData=personData)
 	result <- list(meanQuantities=processPersonsResult$meanQuantities, v2=v2)
 	if (v0$returnEventHistories) 
 		result$eventHistories <- processPersonsResult$eventHistories
@@ -2631,7 +2718,8 @@ generateV2 <- function(v1distributions) {
 # 3b) Probabilistic sensitivity analysis above diagnosis threshold
 # As above, but adapted to work with processPersonsAboveDiagnosticThreshold
 ################################################################################
-psaAboveDiagnosisThreshold <- function(v0, v1other, v1distributions, v2values,threshold=3.0) {
+psaAboveDiagnosisThreshold <- function(v0, v1other, v1distributions, v2values,
+                                       threshold=3.0, personData=NULL) {
 	
 	# Set elements of v0 as needed for PSA. 
 	v0 <- setUnspecifiedElementsOfv0(v0)  
@@ -2645,7 +2733,12 @@ psaAboveDiagnosisThreshold <- function(v0, v1other, v1distributions, v2values,th
 	v1other <- setUnspecifiedElementsOfv1other(v1other)
 	
 	# Check the arguments.
-	checkArgs(v0=v0, v1other=v1other, v1distributions=v1distributions)
+	checkArgs(v0=v0, v1other=v1other, v1distributions=v1distributions, personData=personData)
+	if(!is.null(v1other$qalyFactorBoundaries)){
+	  warning("Assuming startAge is 65 for everyone and calculating qalyFactorAgeBoundaries for you")
+	  v1other$qalyFactorAgeBoundaries <- 65 + v1other$qalyFactorBoundaries
+	  v1other$qalyFactorBoundaries <- NULL
+	}
 	
 	# Display messages, settings, parameters, etc.
 	cat("Running psa on ", Sys.info()["nodename"], " with:\n  ", 
@@ -2658,6 +2751,8 @@ psaAboveDiagnosisThreshold <- function(v0, v1other, v1distributions, v2values,th
 	print(v1other)
 	cat("########## v1distributions ##########\n")
 	print(v1distributions)
+	cat("########## personData ##########\n")
+	print(personData)
 	cat("########################\n\n")
 	if (v0$returnEventHistories) 
 		cat("In psa, v0$returnEventHistories is TRUE, so this will take a ",
@@ -2688,7 +2783,7 @@ psaAboveDiagnosisThreshold <- function(v0, v1other, v1distributions, v2values,th
 		setAndShowRandomSeed(v0$randomSeed, verbose=TRUE)
 		v0$randomSeed <- NULL 
 		resultOfApply <- lapply(X=1:v0$numberOfParameterIterations, 
-				FUN=onePsaIterationAboveDiagnosisThreshold, v0, v1other, v2values, threshold)
+				FUN=onePsaIterationAboveDiagnosisThreshold, v0, v1other, v2values, threshold, personData)
 	} else if (v0$method == "parallel") {
 		# Do PSA in parallel and processPersons serially. 
 		v0$method <- "serial" 
@@ -2701,7 +2796,7 @@ psaAboveDiagnosisThreshold <- function(v0, v1other, v1distributions, v2values,th
 		v0$randomSeed <- NULL 
 		resultOfApply <- parLapply(cl=cluster, 
 				X=1:v0$numberOfParameterIterations, fun=onePsaIterationAboveDiagnosisThreshold, v0, 
-				v1other, v2values, threshold)
+				v1other, v2values, threshold, personData)
 		stopCluster(cluster) 
 	} else if (v0$method == "foreach" || v0$method == "parallelBatches") {
 		stop("v0$method=", v0$method, " has not been implemented for psa")
@@ -2746,7 +2841,7 @@ psaAboveDiagnosisThreshold <- function(v0, v1other, v1distributions, v2values,th
 
 
 onePsaIterationAboveDiagnosisThreshold <- function(psaIterationNumber, v0, v1other, 
-		v2values,threshold) {
+		v2values,threshold, personData) {
   cat(paste0("PSA iteration ", psaIterationNumber, "\n"))
   
 	# Get v2, the values of the uncertain global variables, and check it.
@@ -2759,7 +2854,7 @@ onePsaIterationAboveDiagnosisThreshold <- function(psaIterationNumber, v0, v1oth
 	if (!("probOfNonvisualization" %in% names(v2)))
 		stop("v2 must contain probOfNonvisualization (and many other elements)")
 	
-	processPersonsResult <- processPersonsAboveDiagnosisThreshold(v0, v1other, v2,threshold)
+	processPersonsResult <- processPersonsAboveDiagnosisThreshold(v0, v1other, v2, threshold, personData)
 	result <- list(incrementalMeanQuantities=processPersonsResult$incrementalMeanQuantities, v2=v2)
 
 	return(result)
@@ -2808,8 +2903,8 @@ createQalyFactors <- function(startAge,
 # Given an event-history, the costs, and the names of the required 
 # quantities, calculate the required health-economic quantities.
 calculateHealthEconomicQuantities <- function(
-		eventHistory, namesOfQuantities, costs, v1other, v2) {
-	
+		eventHistory, namesOfQuantities, costs, v1other, v2, v3) {
+
 	# Check arguments. 
 	if (!inherits(eventHistory, "eventHistory"))
 		stop("eventHistory must be an object of class eventHistory")
@@ -2825,9 +2920,13 @@ calculateHealthEconomicQuantities <- function(
 	result["lifeYears"] <- eventHistory$times[length(eventHistory$times)]
 	
 	# Calculate QALYs. 
+	## Get qalyFactorBoundaries and qalyFactors for this individual with their startAge
+	qalyFactorBoundaries <- v1other$qalyFactorAgeBoundaries[v1other$qalyFactorAgeBoundaries > v3$startAge] - v3$startAge
+  qalyFactors <- v2$qalyFactors[c(v1other$qalyFactorAgeBoundaries > v3$startAge, T)]
+  
 	result["qalys"] <- adjustLifeYears(result["lifeYears"], 
-			qalyFactorBoundaries=v1other$qalyFactorBoundaries, 
-			qalyFactors=v2$qalyFactors)
+			qalyFactorBoundaries=qalyFactorBoundaries, 
+			qalyFactors=qalyFactors)
 	
 	# Calculate cost.
 	result["cost"] <- sum(costs[eventHistory$events], na.rm=TRUE)
@@ -2839,8 +2938,8 @@ calculateHealthEconomicQuantities <- function(
 	
 	# Calculate discounted QALYs. 
 	result["discountedQalys"] <- adjustLifeYears(result["lifeYears"], 
-			qalyFactorBoundaries=v1other$qalyFactorBoundaries, 
-			qalyFactors=v2$qalyFactors,
+			qalyFactorBoundaries=qalyFactorBoundaries, 
+			qalyFactors=qalyFactors,
 			discountRate=v1other$lifeYearDiscountRate)
 	
 	# Calculate discounted cost.
@@ -3351,8 +3450,8 @@ displayTime <- function(t) {
 # 6) Check arguments 
 # This is used by processPersons, raising errors.
 ################################################################################
-checkArgs <- function(v0, v1other, v1distributions, v2) {
-	# v0 and v1other must be given, but v1distributions and v2 can be missing.
+checkArgs <- function(v0, v1other, v1distributions, v2, personData) {
+	# v0 and v1other must be given, but v1distributions and v2  can be missing.
 	if (missing(v0) || missing(v1other))
 		stop("v0 and v1other must not be missing")
 	checkV0(v0)
@@ -3362,6 +3461,11 @@ checkArgs <- function(v0, v1other, v1distributions, v2) {
 	if (!missing(v2)) {
 		checkV2(v2)
 		checkV1otherAndV2(v1other, v2)
+	}
+	## Check personData if not null
+	if (!is.null(personData)){
+	  if(class(personData)!="data.frame") stop("personData must be a data.frame")
+	  if(any(!(colnames(personData) %in% c("startAge", "aortaSize", "prob")))) stop("The columns of personData must be named one of startAge, aortaSize and prob")
 	}
 }
 
@@ -3390,10 +3494,10 @@ checkV0andV1other <- function(v0, v1other) {
 	if (v1other$nonAaaDeathMethod == "mass") {
 
 	} else if (v1other$nonAaaDeathMethod == "onsIntegerStart") { 
-		if (any(!(c("startAge","nonAaaMortalityRatesFileName") %in% 
+		if (any(!(c("nonAaaMortalityRatesFileName") %in% 
 							names(v1other))))
 			stop("v1other$nonAaaDeathMethod is onsIntegerStart, so ", 
-					"v1other must contain startAge and nonAaaMortalityRatesFileName")
+					"v1other must contain nonAaaMortalityRatesFileName")
 		
 	} else if (v1other$nonAaaDeathMethod == "onsNonintegerStart") {
 		if (!("nonAaaMortalityRatesFileName" %in% names(v1other)) || 
@@ -3410,6 +3514,12 @@ checkV0andV1other <- function(v0, v1other) {
 }
 
 checkV1other <- function(v1other) {
+  
+  # check that v1other$qalyFactorAgeBoundaries is specified instead of v1other$qalyFactorBoundaries
+  if(!is.null(v1other$qalyFactorBoundaries)){
+    warning("v1other$qalyFactorBoundaries are deprecated. Please specify ages directly using v1other$qalyFactorAgeBoundaries")
+  }  
+  
 	# Check v1other$aortaDiameterThresholds and v1other$monitoringIntervals.
 	if (length(v1other$aortaDiameterThresholds) != 
 			length(v1other$monitoringIntervals)) ## updated MS 07/02/19
@@ -3469,6 +3579,7 @@ checkV1other <- function(v1other) {
 		if (!is.numeric(v1element) || length(v1element) != 1 || v1element < 0)
 			stop("v1other$", varName, " must be a single numeric (or NA)")
 	}
+  return(v1other)
 }
 
 checkV1distributions <- function(v1distributions) {
