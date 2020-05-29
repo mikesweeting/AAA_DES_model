@@ -470,7 +470,7 @@ processPersons <- function(v0, v1other, v2, personData=NULL) {
 	## Only one of v1other$startAge and personData should be specified
 	if(!is.null(v1other$startAge)) warning("v1other$startAge is deprecated. Please specify age distribution in personData instead")
 	if(!is.null(v1other$startAge) & !is.null(personData)) stop("Only one of v1other$startAge and personData can be specified")
-	## If v1other exists then assign is to personData$startAge 
+	## If v1other$startAge exists then assign it to personData$startAge 
 	if(!is.null(v1other$startAge)){
 	  personData <- data.frame(startAge = v1other$startAge)
     v1other$startAge <- NULL
@@ -728,7 +728,8 @@ processPersonsAboveDiagnosisThreshold <- function(v0, v1other, v2,
 # (the last two only if v0$returnEventHistories is TRUE). 
 ################################################################################
 processOnePair <- function(personNumber, v0, v1other, v2, personData) {
-
+  # cat(personNumber, "\n")
+  
 	# Check the arguments.
 	if (!("namesOfQuantities" %in% names(v0)))
 		stop("processOnePair needs v0$namesOfQuantities to exist;",
@@ -1456,7 +1457,7 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 	scheduledEvents["rupture"] <- v3$ruptureTime
 	scheduledEvents["nonAaaDeath"] <- v3$nonAaaDeathTime
 	if (treatmentGroup=="screening") 
-		scheduledEvents["inviteToScreen"] <- v1other$waitingTimeToInvitation
+		scheduledEvents["inviteToScreen"] <- v1other$inviteToScreenSuspensionTime
 	if (treatmentGroup=="noScreening"){
 	  gID <- generateIncidentalDetectionTime(0, 
 	                                  v1other$thresholdForIncidentalDetection, v3, 
@@ -1484,6 +1485,7 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			print(scheduledEvents)
 			stop("eventTime is NA") 
 		}
+	
 		eventHistory <- addEvent(eventHistory, eventType, eventTime)
 		scheduledEvents[eventType] <- NA 
 	
@@ -1532,7 +1534,7 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			  v3 <- gID$v3
 			} else if (aortaSizeGroup < length(v1other$aortaDiameterThresholds)) {
 			  scheduledEvents["monitor"] <- 
-						eventTime + v1other$monitoringIntervals[aortaSizeGroup+1] ## Updated MS. 07/02/19
+						max(v1other$monitoringIntervalsSuspensionTime[aortaSizeGroup+1], eventTime + v1other$monitoringIntervals[aortaSizeGroup+1]) 
 			  gD <- generateDropoutTime(eventTime, 
                     v2$rateOfDropoutFromMonitoring, v3)
 			  scheduledEvents["dropout"] <- gD$time
@@ -1562,10 +1564,10 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			    eventHistory <- addEvent(eventHistory, 
 			                             "aortaDiameterBelowThreshold", eventTime)
 			    scheduledEvents["monitor"] <- 
-			      eventTime + v1other$monitoringIntervals[1]
+			      max(v1other$monitoringIntervalsSuspensionTime[1], eventTime + v1other$monitoringIntervals[1]) 
 			  } else if (aortaSizeGroup < length(v1other$aortaDiameterThresholds)) {
 			    scheduledEvents["monitor"] <- 
-			      eventTime + v1other$monitoringIntervals[aortaSizeGroup + 1] ## updated MS 07/02/19
+			      max(v1other$monitoringIntervalsSuspensionTime[aortaSizeGroup+1], eventTime + v1other$monitoringIntervals[aortaSizeGroup+1]) 
 			  } else {
 			    scheduledEvents["consultation"] <- 
 			      eventTime + v1other$waitingTimeToConsultation
@@ -1598,7 +1600,7 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 				eventHistory <- addEvent(eventHistory, 
 						"decideOnReturnToMonitoring", eventTime)
 				scheduledEvents["monitor"] <- 
-						eventTime + v1other$monitoringIntervals[aortaSizeGroup + 1] ## updated MS 07/02/19
+				  max(v1other$monitoringIntervalsSuspensionTime[aortaSizeGroup+1], eventTime + v1other$monitoringIntervals[aortaSizeGroup+1]) 
 				gD <- generateDropoutTime(eventTime, 
 				                          v2$rateOfDropoutFromMonitoring, v3) 
 				scheduledEvents["dropout"] <- gD$time
@@ -1617,9 +1619,8 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 				if ("monitoringIntervalFollowingContraindication" %in% 
 						names(v1other))
 					scheduledEvents["monitorFollowingContraindication"] <- 
-							eventTime + 
-							v1other$monitoringIntervalFollowingContraindication
-		
+				    max(v1other$monitoringIntervalFollowingContraindicationSuspensionTime, eventTime + v1other$monitoringIntervalFollowingContraindication) 	
+
 			} else {  
 				eventHistory <- addEvent(eventHistory, 
 						"decideOnElectiveSurgery", eventTime)
@@ -1635,7 +1636,8 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			
 		} else if (eventType=="monitorFollowingContraindication") {
 			scheduledEvents["monitorFollowingContraindication"] <- 
-					eventTime + v1other$monitoringIntervalFollowingContraindication
+			  max(v1other$monitoringIntervalFollowingContraindicationSuspensionTime, eventTime + v1other$monitoringIntervalFollowingContraindication) 	
+			
 			
 		} else if (eventType=="electiveSurgeryOpen" || 
 				eventType=="electiveSurgeryEvar") {
@@ -1696,11 +1698,11 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 	
 			# Post-surgery monitoring. 
 			if (eventType == "electiveSurgeryOpen") {
-				scheduledEvents["monitorFollowingOpenSurgery"] <- eventTime + 
-						v1other$timeToMonitoringFollowingOpenSurgery
+				scheduledEvents["monitorFollowingOpenSurgery"] <- 
+				  max(v1other$monitorFollowingOpenSurgerySuspensionTime, eventTime + v1other$timeToMonitoringFollowingOpenSurgery) 	
 			} else {
-				scheduledEvents["monitorFollowingEvarSurgery"] <- eventTime + 
-						v1other$timeBetweenMonitoringFollowingEvarSurgery
+				scheduledEvents["monitorFollowingEvarSurgery"] <- 
+				  max(v1other$monitorFollowingEvarSurgerySuspensionTime, eventTime + v1other$timeBetweenMonitoringFollowingEvarSurgery) 	
 			}
 				
 		} else if (eventType=="rupture") {
@@ -1781,11 +1783,11 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 
 			# Post-surgery monitoring. 
 			if (eventType == "emergencySurgeryOpen") {
-				scheduledEvents["monitorFollowingOpenSurgery"] <- eventTime + 
-						v1other$timeToMonitoringFollowingOpenSurgery
+				scheduledEvents["monitorFollowingOpenSurgery"] <- 
+				  max(v1other$monitorFollowingOpenSurgerySuspensionTime, eventTime + v1other$timeToMonitoringFollowingOpenSurgery) 	
 			} else {
-				scheduledEvents["monitorFollowingEvarSurgery"] <- eventTime + 
-						v1other$timeBetweenMonitoringFollowingEvarSurgery
+				scheduledEvents["monitorFollowingEvarSurgery"] <- 
+				  max(v1other$monitorFollowingEvarSurgerySuspensionTime, eventTime + v1other$timeBetweenMonitoringFollowingEvarSurgery) 	
 			}
 	
 		} else if (eventType %in% c("aaaDeath", "nonAaaDeath", "censored")) {
@@ -1796,7 +1798,8 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 					v1other$thresholdForIncidentalDetection)
 				stop("incidentalDetection happened when aorta was below ",
 						v1other$thresholdForIncidentalDetection, "cm")
-			scheduledEvents["monitor"] <- eventTime
+		  
+			scheduledEvents["monitor"] <- max(v1other$incidentalDetectionSuspensionTime, eventTime)
 			gD <- generateDropoutTime(eventTime, 
 			                          v2$rateOfDropoutFromMonitoring, v3)
 			scheduledEvents["dropout"] <- gD$time
@@ -1829,9 +1832,8 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			
 		} else if (eventType == "monitorFollowingEvarSurgery") {
 			# Schedule the next one.
-			scheduledEvents["monitorFollowingEvarSurgery"] <- eventTime + 
-					v1other$timeBetweenMonitoringFollowingEvarSurgery
-					
+			scheduledEvents["monitorFollowingEvarSurgery"] <- 
+			  max(v1other$monitorFollowingEvarSurgerySuspensionTime, eventTime + 	v1other$timeBetweenMonitoringFollowingEvarSurgery) 	
 		} else {
 			stop("INTERNAL ERROR: unknown event-type ", eventType)
 		}
@@ -2018,8 +2020,9 @@ addEvent <- function(eventHistory, event, time, trueSize=NA, measuredSize=NA) {
 	# Checks.
 	checkIsEventHistory(eventHistory)
 	numberOfEvents <- length(eventHistory$events)
-	if (numberOfEvents >= 1 && time < eventHistory$times[numberOfEvents]) 
-		stop("the time of the new event must be >= all eventHistory times")
+	if (numberOfEvents >= 1 && time < eventHistory$times[numberOfEvents]) {
+	  stop("the time of the new event must be >= all eventHistory times")
+	} 
 	# Add the new event.
 	if ("trueSizes" %in% names(eventHistory)) {
 		varNames <- c("event", "time", "trueSize", "measuredSize")
@@ -3281,7 +3284,12 @@ setUnspecifiedElementsOfv0 <- function(v0) {
 setUnspecifiedElementsOfv1other <- function(v1other) {
   # Create a list that contains the default values. 
   defaults <- list(
-    waitingTimeToInvitation = 0
+    inviteToScreenSuspensionTime = 0,
+    monitoringIntervalsSuspensionTime = rep(0, length(v1other$monitoringIntervals)),
+    monitoringIntervalFollowingContraindicationSuspensionTime = 0,
+    monitorFollowingOpenSurgerySuspensionTime = 0,
+    monitorFollowingEvarSurgerySuspensionTime = 0,
+    incidentalDetectionSuspensionTime = 0
   )
   for (i in 1:length(defaults)) {
     varName <- names(defaults)[i]
@@ -3532,6 +3540,13 @@ checkV1other <- function(v1other) {
 			sort(v1other$monitoringIntervals, decreasing=TRUE)))
 		stop("v1other$monitoringIntervals must be in decreasing order")
 	
+  # Check if suspension times for monitoring exist
+  # If they do, check they are of correct length
+  if(!is.null(v1other$monitoringIntervalsSuspensionTime)){
+    if(length(v1other$monitoringIntervalsSuspensionTime) != length(v1other$monitoringIntervals))
+      stop("v1other$monitoringIntervalsSuspensionTime and v1other$monitoringIntervals must be the same length")
+  }
+  
   # Check that v1other$maxNumberMonitor exists
   if(!("maxNumberMonitor" %in% names(v1other)))
     stop("v1other$maxNumberMonitor must be specified.
