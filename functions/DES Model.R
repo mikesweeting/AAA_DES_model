@@ -254,8 +254,14 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
     }
     
     ## Assign last monitoring interval input to v1other$monitoringIntervalFollowingContraindication and remove it from v1other$monitoringIntervals
+    ## check not already assigned
+    if(!is.null(v1other$monitoringIntervalFollowingContraindication) | !is.null(v1other$monitoringIntervalFollowingContraindicationSuspensionTime)){
+      stop("The monitoring interval and suspension time following contraindication should now be specified as the last element of monitoringIntervals")
+    }
     v1other$monitoringIntervalFollowingContraindication <- v1other$monitoringIntervals[length(v1other$monitoringIntervals)]
     v1other$monitoringIntervals <- v1other$monitoringIntervals[-length(v1other$monitoringIntervals)]
+    v1other$monitoringIntervalFollowingContraindicationSuspensionTime <- v1other$monitoringIntervalsSuspensionTime[length(v1other$monitoringIntervalsSuspensionTime)]
+    v1other$monitoringIntervalsSuspensionTime <- v1other$monitoringIntervalsSuspensionTime[-length(v1other$monitoringIntervalsSuspensionTime)]
     
     ## Assign PSA probability distributions
     mean.d.costs <- variance.d.costs <- list()
@@ -728,7 +734,7 @@ processPersonsAboveDiagnosisThreshold <- function(v0, v1other, v2,
 # (the last two only if v0$returnEventHistories is TRUE). 
 ################################################################################
 processOnePair <- function(personNumber, v0, v1other, v2, personData) {
-  # cat(personNumber, "\n")
+  #cat(personNumber, "\n")
   
 	# Check the arguments.
 	if (!("namesOfQuantities" %in% names(v0)))
@@ -807,9 +813,10 @@ processOnePair <- function(personNumber, v0, v1other, v2, personData) {
 	      v3[["rateOfReintervention"]] <- setType(runif(50), "propensity")
 	    }
 	  }
-	  
+
 	  if (getType(v2element) == "probability")
-	    v3[[elementName]] <- setType(rbernoulli(v2element), "boolean")
+	    #v3[[elementName]] <- setType(rbernoulli(v2element), "boolean")
+	    v3[[elementName]] <- setType(runif(1), "propensity")
 	}
 
 	# Generate censoring-time.
@@ -819,7 +826,7 @@ processOnePair <- function(personNumber, v0, v1other, v2, personData) {
 	
 	# Put the person through the different treatments. 
 	for (treatmentGroup in v0$treatmentGroups) {
-		
+	
 		# Create full list of events. 
 		eventHistory <- 
 				generateEventHistory(v0, v1other, v2, v3, treatmentGroup)
@@ -1472,10 +1479,10 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 	numberMonitor <- rep(0,length(v1other$aortaDiameterThresholds)+1)
 	
 	repeat {
-		# Make sure that all the scheduled times are different (exclude NAs and Infinities -- MS added 24/07/2019).
+	  # Make sure that all the scheduled times are different (exclude NAs and Infinities -- MS added 24/07/2019).
 	  # Allow censored == monitored - Added by MS 02/08/19
-		if (!allDifferent(scheduledEvents) & scheduledEvents["censored"] != scheduledEvents["monitor"]) {
-			print(scheduledEvents)
+	  if (!allDifferent(scheduledEvents) & scheduledEvents["censored"] != scheduledEvents["monitor"]) {
+	    print(scheduledEvents)
 			stop("scheduledEvents times must all be different")
 		}
 		
@@ -1491,10 +1498,16 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 	
 		# Update scheduledEvents as appropriate based on what eventType is.
 		if (eventType=="inviteToScreen") {
-			if (v3$probOfRequireReinvitation) {
+		  gBV <- getBinaryVariable("probOfRequireReinvitation", v1other, v2, v3, eventTime)
+		  requireReinvitation <- gBV$result
+		  v3 <- gBV$v3
+			if (requireReinvitation) {
 				eventHistory <- addEvent(eventHistory, "requireReinvitation", eventTime)
 			} 
-			if (v3$probOfAttendScreen) {
+		  gBV <- getBinaryVariable("probOfAttendScreen", v1other, v2, v3, eventTime)
+		  attendScreen <- gBV$result
+		  v3 <- gBV$v3
+			if (attendScreen) {
 				scheduledEvents["screen"] <- eventTime   # ("screen" means they attend)
 			} else {
 				eventHistory <- addEvent(eventHistory, "failToAttendScreen", eventTime)
@@ -1509,14 +1522,17 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			aortaSize <- v3$initialAortaSizeAsMeasured
 			if (is.null(aortaSize) || is.na(aortaSize))
 				stop("aortaSize is NA or NULL")
-
-			if ("trueSizes" %in% names(eventHistory) && !v3$probOfNonvisualization)  
+			
+			gBV <- getBinaryVariable("probOfNonvisualization", v1other, v2, v3, eventTime)
+			nonvisualization <- gBV$result
+			v3 <- gBV$v3
+			if ("trueSizes" %in% names(eventHistory) && !nonvisualization)  
 				# The true size is unknown, so set that to NA. The measured 
 				# size is aortaSize, so record that.
 				eventHistory <- recordSize(eventHistory, NA, aortaSize)			
 	
 			# If they have nonvisualization.
-			if (v3$probOfNonvisualization) 
+			if (nonvisualization) 
 				eventHistory <- addEvent(eventHistory, "nonvisualization", 
 						eventTime)
 			
@@ -1526,7 +1542,7 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			## Add one to the times patient has been screened or monitored in this size group
 			numberMonitor[aortaSizeGroup + 1] <- numberMonitor[aortaSizeGroup + 1] + 1
 			
-			if (aortaSizeGroup == 0 || v3$probOfNonvisualization) {  ## Assumes that first group is screened normal group
+			if (aortaSizeGroup == 0 || nonvisualization) {  ## Assumes that first group is screened normal group
 			  gID <- generateIncidentalDetectionTime(eventTime, 
 			                                         v1other$thresholdForIncidentalDetection, v3, 
 			                                         v2$rateOfIncidentalDetection)
@@ -1648,11 +1664,19 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 				if (surgeryType=="evar")
 					stop("surgeryType=\"evar\" should be impossible when ",
 						"v1other$electiveSurgeryAaaDeathMethod=\"instantDeathOnly\"")
-				dieFromElectiveSurgery <- { if(
-						"incidentalDetection" %in% eventHistory$events)
-						v3$probOfDieFromElectiveSurgeryViaIncidentalDetection
-						else
-						v3$probOfDieFromElectiveSurgeryViaScreeningDetection }
+				dieFromElectiveSurgery <- { if("incidentalDetection" %in% eventHistory$events){
+				  gBV <- getBinaryVariable("probOfDieFromElectiveSurgeryViaIncidentalDetection", v1other, v2, v3, eventTime)
+				  dieFromElectiveSurgeryViaIncidentalDetection <- gBV$result
+				  v3 <- gBV$v3
+				  dieFromElectiveSurgeryViaIncidentalDetection
+				}
+				  else {
+				    gBV <- getBinaryVariable("probOfDieFromElectiveSurgeryViaScreeningDetection", v1other, v2, v3, eventTime)
+				    dieFromElectiveSurgeryViaScreeningDetection <- gBV$result
+				    v3 <- gBV$v3
+				    dieFromElectiveSurgeryViaScreeningDetection 
+				  }
+				}
 				if (dieFromElectiveSurgery) { 
 					eventHistory <- addEvent(eventHistory, "aaaDeath",eventTime)
 					break
@@ -1710,7 +1734,10 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 				trueSize <- getAortaMeasurement(v3, eventTime, method="exact")
 				eventHistory <- recordSize(eventHistory, trueSize, NA)
 			}
-			if (v3$probOfEmergencySurgeryIfRupture) {
+		  gBV <- getBinaryVariable("probOfEmergencySurgeryIfRupture", v1other, v2, v3, eventTime)
+		  emergencySurgeryIfRupture <- gBV$result
+		  v3 <- gBV$v3
+		  if (emergencySurgeryIfRupture) {
 			  gBV <- getBinaryVariable(
 			    "probOfEmergencySurgeryIsOpen", v1other, v2, v3, eventTime)
 			  emergencySurgeryIsOpen <- gBV$result
@@ -1722,7 +1749,7 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 				eventHistory <- addEvent(eventHistory, "aaaDeath", eventTime)
 				break
 			}
-			eventsToCancel <- c("monitor", "dropout", "incidentalDetection", 
+			eventsToCancel <- c("inviteToScreen", "monitor", "dropout", "incidentalDetection", 
 				"electiveSurgeryOpen", "electiveSurgeryEvar", "consultation")
 			scheduledEvents[eventsToCancel] <- NA
 			
@@ -1736,8 +1763,11 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 					stop("code for v1other$emergencySurgeryAaaDeathMethod=",
 							"\"instantDeathOnly\" and surgeryType=\"evar\" ",
 							"has not been written")
-
-				if (v3$probOfDieFromEmergencySurgery) {
+			  
+			  gBV <- getBinaryVariable("probOfDieFromEmergencySurgery", v1other, v2, v3, eventTime)
+			  dieFromEmergencySurgery <- gBV$result
+			  v3 <- gBV$v3
+				if (dieFromEmergencySurgery) {
 					eventHistory <- 
 							addEvent(eventHistory, "aaaDeath", eventTime)
 					break
@@ -1858,9 +1888,10 @@ getBinaryVariable <- function(varName, v1other, v2, v3, eventTime) {
 	
 	# Get the result.
 	if (varName %in% names(v3) & getType(v2[[varName]]) != "logistic model for probability") {
-		if (!(getType(v3[[varName]]) %in% c("boolean", "fixed value")))
-			stop("v3$", varName, " must have type boolean or fixed value")
-		result <- v3[[varName]]
+		if (!(getType(v3[[varName]]) %in% c("propensity", "fixed value")))
+			stop("v3$", varName, " must have type propensity or fixed value")
+    prob <- v2[[varName]]
+		result <- prob > v3[[varName]]
 		
 	} else if (varName %in% names(v2) && 
 			getType(v2[[varName]]) == "logistic model for probability") {
@@ -3286,7 +3317,6 @@ setUnspecifiedElementsOfv1other <- function(v1other) {
   defaults <- list(
     inviteToScreenSuspensionTime = 0,
     monitoringIntervalsSuspensionTime = rep(0, length(v1other$monitoringIntervals)),
-    monitoringIntervalFollowingContraindicationSuspensionTime = 0,
     monitorFollowingOpenSurgerySuspensionTime = 0,
     monitorFollowingEvarSurgerySuspensionTime = 0,
     incidentalDetectionSuspensionTime = 0
