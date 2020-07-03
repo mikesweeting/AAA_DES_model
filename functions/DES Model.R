@@ -253,16 +253,6 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
       }
     }
     
-    ## Assign last monitoring interval input to v1other$monitoringIntervalFollowingContraindication and remove it from v1other$monitoringIntervals
-    ## check not already assigned
-    if(!is.null(v1other$monitoringIntervalFollowingContraindication) | !is.null(v1other$monitoringIntervalFollowingContraindicationSuspensionTime)){
-      stop("The monitoring interval and suspension time following contraindication should now be specified as the last element of monitoringIntervals")
-    }
-    v1other$monitoringIntervalFollowingContraindication <- v1other$monitoringIntervals[length(v1other$monitoringIntervals)]
-    v1other$monitoringIntervals <- v1other$monitoringIntervals[-length(v1other$monitoringIntervals)]
-    v1other$monitoringIntervalFollowingContraindicationSuspensionTime <- v1other$monitoringIntervalsSuspensionTime[length(v1other$monitoringIntervalsSuspensionTime)]
-    v1other$monitoringIntervalsSuspensionTime <- v1other$monitoringIntervalsSuspensionTime[-length(v1other$monitoringIntervalsSuspensionTime)]
-    
     ## Assign PSA probability distributions
     mean.d.costs <- variance.d.costs <- list()
     for(i in 1:dim(DESData)[1]){
@@ -465,6 +455,16 @@ processPersons <- function(v0, v1other, v2, personData=NULL) {
 	# Set unspecified elements of v1other to default values
 	v1other <- setUnspecifiedElementsOfv1other(v1other)
 	
+	## Assign last monitoring interval input to v1other$monitoringIntervalFollowingContraindication and remove it from v1other$monitoringIntervals
+	## check not already assigned
+	if(!is.null(v1other$monitoringIntervalFollowingContraindication) | !is.null(v1other$monitoringIntervalFollowingContraindicationSuspensionTime)){
+	  stop("The monitoring interval and suspension time following contraindication should now be specified as the last element of monitoringIntervals")
+	}
+	v1other$monitoringIntervalFollowingContraindication <- v1other$monitoringIntervals[length(v1other$monitoringIntervals)]
+	v1other$monitoringIntervals <- v1other$monitoringIntervals[-length(v1other$monitoringIntervals)]
+	v1other$monitoringIntervalFollowingContraindicationSuspensionTime <- v1other$monitoringIntervalsSuspensionTime[length(v1other$monitoringIntervalsSuspensionTime)]
+	v1other$monitoringIntervalsSuspensionTime <- v1other$monitoringIntervalsSuspensionTime[-length(v1other$monitoringIntervalsSuspensionTime)]
+	
 	# Check the arguments.
 	checkArgs(v0=v0, v1other=v1other, v2=v2, personData=personData)
 	if(!is.null(v1other$qalyFactorBoundaries)){
@@ -485,7 +485,7 @@ processPersons <- function(v0, v1other, v2, personData=NULL) {
 	if(is.null(personData$prob)){
 	  personData$prob <- 1
 	}
-	  
+	
 	# Display v0, v1other, and v2
 	if (v0$verbose) {
 		cat("Running processPersons on ", Sys.info()["nodename"], 
@@ -885,6 +885,16 @@ processPersonsControlOnly <- function(v0, v1other, v2, updateProgress=NULL, pers
   
   # Set unspecified elements of v1other to default values
   v1other <- setUnspecifiedElementsOfv1other(v1other)
+  
+  ## Assign last monitoring interval input to v1other$monitoringIntervalFollowingContraindication and remove it from v1other$monitoringIntervals
+  ## check not already assigned
+  if(!is.null(v1other$monitoringIntervalFollowingContraindication) | !is.null(v1other$monitoringIntervalFollowingContraindicationSuspensionTime)){
+    stop("The monitoring interval and suspension time following contraindication should now be specified as the last element of monitoringIntervals")
+  }
+  v1other$monitoringIntervalFollowingContraindication <- v1other$monitoringIntervals[length(v1other$monitoringIntervals)]
+  v1other$monitoringIntervals <- v1other$monitoringIntervals[-length(v1other$monitoringIntervals)]
+  v1other$monitoringIntervalFollowingContraindicationSuspensionTime <- v1other$monitoringIntervalsSuspensionTime[length(v1other$monitoringIntervalsSuspensionTime)]
+  v1other$monitoringIntervalsSuspensionTime <- v1other$monitoringIntervalsSuspensionTime[-length(v1other$monitoringIntervalsSuspensionTime)]
   
   # Check the arguments.
   checkArgs(v0=v0, v1other=v1other, v2=v2, personData=personData)
@@ -1634,7 +1644,7 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 				# Post-contraindication monitoring. 
 				if ("monitoringIntervalFollowingContraindication" %in% 
 						names(v1other))
-					scheduledEvents["monitorFollowingContraindication"] <- 
+				scheduledEvents["monitorFollowingContraindication"] <- 
 				    max(v1other$monitoringIntervalFollowingContraindicationSuspensionTime, eventTime + v1other$monitoringIntervalFollowingContraindication) 	
 
 			} else {  
@@ -1895,7 +1905,6 @@ getBinaryVariable <- function(varName, v1other, v2, v3, eventTime) {
 		
 	} else if (varName %in% names(v2) && 
 			getType(v2[[varName]]) == "logistic model for probability") {
-
 		# Make beta and logOddsAdjustment. 
 		beta <- v2[[varName]][names(v2[[varName]]) != "logOddsAdjustment"]
 		logOddsAdjustment <- v2[[varName]]["logOddsAdjustment"]  
@@ -3561,8 +3570,9 @@ checkV1other <- function(v1other) {
 	# Check v1other$aortaDiameterThresholds and v1other$monitoringIntervals.
 	if (length(v1other$aortaDiameterThresholds) != 
 			length(v1other$monitoringIntervals)) ## updated MS 07/02/19
-		stop("v1other$aortaDiameterThresholds must be the same length as v1other$monitoringIntervals. 
-		     The first element of v1other$monitoringIntervals should be the monitoring interval for AAA in surveillance who drop below first diameter threshold")
+		stop("v1other$aortaDiameterThresholds must be the same length as v1other$monitoringIntervals. \n
+		     The first element of v1other$monitoringIntervals should be the monitoring interval for AAA in surveillance who drop below first diameter threshold \n
+		     The last element of v1other$monitoringIntervals should be the monitoring interval for contraindicated AAA")
 	if (!identical(v1other$aortaDiameterThresholds, 
 			sort(v1other$aortaDiameterThresholds)))
 		stop("v1other$aortaDiameterThresholds must be in increasing order")

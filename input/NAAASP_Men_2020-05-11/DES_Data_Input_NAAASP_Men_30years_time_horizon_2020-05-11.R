@@ -120,7 +120,7 @@ dimnames(v1distributions$covarianceForRuptureParameters) <-
 
 # Surveillance intervals
 v1other$aortaDiameterThresholds <- c(3.0, 4.5, 5.5)
-v1other$monitoringIntervals <- c(1, 1, 0.25)
+v1other$monitoringIntervals <- c(1, 1, 0.25, Inf)
 v1other$maxNumberMonitor <- c(Inf, Inf, Inf)
 
 # Dropout rate from surveillance
