@@ -1895,52 +1895,64 @@ getBinaryVariable <- function(varName, v1other, v2, v3, eventTime) {
 	if (!missing(eventTime) && (is.null(eventTime) || is.na(eventTime) || 
 			!is.numeric(eventTime) || length(eventTime) != 1 || eventTime < 0))
 		stop("eventTime must be a single non-negative numeric")
-	
 	# Get the result.
 	if (varName %in% names(v3) & getType(v2[[varName]]) != "logistic model for probability") {
 		if (!(getType(v3[[varName]]) %in% c("propensity", "fixed value")))
 			stop("v3$", varName, " must have type propensity or fixed value")
-    prob <- v2[[varName]]
-		result <- prob > v3[[varName]]
-		
+    if(is.null(attr(v2[[varName]], "timeCutPoints"))){
+      ind <- 1
+    } else {
+      timeCutPoints <- c(0, attr(v2[[varName]], "timeCutPoints"))
+      ind <- findInterval(eventTime, timeCutPoints)
+    }
+	  prob <- v2[[varName]][ind]
+	  result <- prob > v3[[varName]]
 	} else if (varName %in% names(v2) && 
-			getType(v2[[varName]]) == "logistic model for probability") {
-		# Make beta and logOddsAdjustment. 
-		beta <- v2[[varName]][names(v2[[varName]]) != "logOddsAdjustment"]
-		logOddsAdjustment <- v2[[varName]]["logOddsAdjustment"]  
-		
-		# Calculate the covariates.
-		covariates <- rep(NA, length(beta) - 1)
-		names(covariates) <- names(beta)[-1]  
-		for (covariateName in names(covariates)) {
-		  ## NEED TO ENSURE v3 IS ASSIGNED BACK TO GENERATEEVENTHISTORY
-			covariates[covariateName] <- switch(covariateName,
-					age = v3$startAge + eventTime - 80,
-					aortaSize = getAortaMeasurement(v3, eventTime, 
-						v2$ultrasoundMeasurementErrorSD, method="ultrasound", propensity=v3[["aortaSize"]][1]) - 6.0,
-					stop("in v2$", varName, ", the name \"", covariateName, 
-					"\" is illegal")
-			)
-			if(covariateName == "aortaSize"){
-			  v3[["aortaSize"]] <- v3[["aortaSize"]][-1]
-			}
-			  
-		}
-		
-		# Calculate the probability and use that to generate a boolean value 
-		# from the Bernoulli distribution.
-		prob <- calculateProbFromLogisticModel(beta=beta, 
-				covariates=covariates, logOddsAdjustment=logOddsAdjustment)
-		# result <- rbernoulli(prob)
-		## Use propensity to calculate whether event occurs or not
-		result <- prob > v3[[varName]]
-		
-	
+	           getType(v2[[varName]]) == "logistic model for probability") {
+	  if(is.null(attr(v2[[varName]], "timeCutPoints"))){
+	    # Make beta and logOddsAdjustment. 
+	    beta <- v2[[varName]][names(v2[[varName]]) != "logOddsAdjustment"]
+	    logOddsAdjustment <- v2[[varName]]["logOddsAdjustment"]  
+	  } else {
+	    # Make beta and logOddsAdjustment. 
+	    timeCutPoints <- c(0, attr(v2[[varName]], "timeCutPoints"))
+	    ind <- findInterval(eventTime, timeCutPoints)
+	    beta <- sapply(v2[[varName]][names(v2[[varName]]) != "logOddsAdjustment"], function(i){i[ind]})
+	    logOddsAdjustment <- unlist(sapply(v2[[varName]]["logOddsAdjustment"], function(i){i[ind]}))  	    
+	  }
+	  
+	  
+	  # Calculate the covariates.
+	  covariates <- rep(NA, length(beta) - 1)
+	  names(covariates) <- names(beta)[-1]  
+	  for (covariateName in names(covariates)) {
+	    ## NEED TO ENSURE v3 IS ASSIGNED BACK TO GENERATEEVENTHISTORY
+	    covariates[covariateName] <- switch(covariateName,
+	                                        age = v3$startAge + eventTime - 80,
+	                                        aortaSize = getAortaMeasurement(v3, eventTime, 
+	                                                                        v2$ultrasoundMeasurementErrorSD, method="ultrasound", propensity=v3[["aortaSize"]][1]) - 6.0,
+	                                        stop("in v2$", varName, ", the name \"", covariateName, 
+	                                             "\" is illegal")
+	    )
+	    if(covariateName == "aortaSize"){
+	      v3[["aortaSize"]] <- v3[["aortaSize"]][-1]
+	    }
+	    
+	  }
+	  
+	  # Calculate the probability and use that to generate a boolean value 
+	  # from the Bernoulli distribution.
+	  prob <- calculateProbFromLogisticModel(beta=beta, 
+	                                         covariates=covariates, logOddsAdjustment=logOddsAdjustment)
+	  ## Use propensity to calculate whether event occurs or not
+	  result <- prob > v3[[varName]]
+	  
+	  
 	} else {
-		cat("\n\nvarName=", varName, "\nv2:\n", sep=""); print(v2); 
-		cat("\nv3:\n"); print(v3)
-		stop("failed to find acceptable element ", varName, " in v2 or v3")
-		
+	  cat("\n\nvarName=", varName, "\nv2:\n", sep=""); print(v2); 
+	  cat("\nv3:\n"); print(v3)
+	  stop("failed to find acceptable element ", varName, " in v2 or v3")
+	  
 	}
 	
 	if (is.null(result) || is.na(result)) {
@@ -2482,14 +2494,6 @@ psa <- function(v0, v1other, v1distributions, v2values, personData=NULL) {
 	# Set unspecified elements of v1other to default values
 	v1other <- setUnspecifiedElementsOfv1other(v1other)
 	
-	# Check the arguments.
-	checkArgs(v0=v0, v1other=v1other, v1distributions=v1distributions, personData=personData)
-	if(!is.null(v1other$qalyFactorBoundaries)){
-	  warning("Assuming startAge is 65 for everyone and calculating qalyFactorAgeBoundaries for you")
-	  v1other$qalyFactorAgeBoundaries <- 65 + v1other$qalyFactorBoundaries
-	  v1other$qalyFactorBoundaries <- NULL
-	}
-	
 	# Display messages, settings, parameters, etc.
 	cat("Running psa on ", Sys.info()["nodename"], " with:\n  ", 
 			"v0$numberOfParameterIterations=", v0$numberOfParameterIterations, 
@@ -2516,7 +2520,7 @@ psa <- function(v0, v1other, v1distributions, v2values, personData=NULL) {
 		if (missing(v2values)) {  
 		setAndShowRandomSeed(v0$randomSeed, verbose=TRUE)  # uses set.seed
 		v2values <- replicate(n=v0$numberOfParameterIterations, 
-				expr=generateV2(v1distributions), simplify=FALSE) 
+				expr=generateV2(v1distributions, v2), simplify=FALSE) 
 	} else {
 		npi <- v0$numberOfParameterIterations
 		if (!is.list(v2values) || !all(sapply(v2values, is.list)) ||
@@ -2608,7 +2612,8 @@ onePsaIteration <- function(psaIterationNumber, v0, v1other,
 # generateV2, a function to generate specific values of v2, the global 
 # uncertain parameters, from v1distributions, the global fixed parameters that 
 # are used for generating elements of v2. 
-generateV2 <- function(v1distributions) {
+# Now does some elementary checks to make sure v1distributions is coherant with v2
+generateV2 <- function(v1distributions, v2old) {
 	
 	v2 <- compactList()
 	
@@ -2620,6 +2625,14 @@ generateV2 <- function(v1distributions) {
 		if (is.null(type)) 
 			stop("the \"type\" element of v1distributions$", elementName, 
 					" is NULL")
+		## if v2old has attribute timeCutPoints then ensure v1distribution also has this and with the same length of cut-points
+		if(!is.null(attr(v2old[[elementName]], "timeCutPoints"))){
+		  if(is.null(attr(v1distributions[[elementName]], "timeCutPoints")))
+		    stop(paste0("v1distributions for ", elementName, " is missing timeCutPoints"))
+		  if(any(attr(v1distributions[[elementName]], "timeCutPoints") != attr(v2old[[elementName]], "timeCutPoints")))
+		    stop(paste0("timeCutPoints for v2 and v1distributions for ", elementName, " must be identical"))
+		}
+		
 		
 		if (type == "fixed value") {
 			v2element <- v1element
@@ -2627,41 +2640,108 @@ generateV2 <- function(v1distributions) {
 		  v2element <- v1element
 		  attr(v2element, "type") <- "qaly"
 		}	else if (type == "beta pars for probability") {
-			v2element <- myRbeta(n=1, 
-					shape1=v1element$alpha, shape2=v1element$beta)
-			attr(v2element, "type") <- "probability"
-			
+		  ## check that v2old is of type probability
+		  if(attr(v2old[[elementName]], "type")!="probability")
+		    stop(paste0("v2 and v1distributions for parmaeter ", elementName, " are incompatible"))
+		  if(!is.null(attr(v1element, "timeCutPoints"))){
+		    if(length(v1element$alpha)!=length(v1element$beta) | 
+		       length(v1element$alpha)!=(length(attr(v1element, "timeCutPoints"))+1))
+		      stop(paste0("Length of alpha and beta from v1distribution$", elementName, " not correct"))
+		    v2element <- myRbeta(n=length(v1element$alpha), 
+		            shape1=v1element$alpha, shape2=v1element$beta)
+		    attr(v2element, "type") <- "probability"
+		    attr(v2element, "timeCutPoints") <- attr(v1element, "timeCutPoints")
+		  } else {
+		    v2element <- myRbeta(n=1, 
+		                         shape1=v1element$alpha, shape2=v1element$beta)
+		    attr(v2element, "type") <- "probability"
+		  }			
 		} else if (type == "hyperpars for logistic model for probability") {
-			require(MASS, quietly=TRUE)
-			if (length(v1element$mean) == 1) {
-				v2element <- rnorm(n=1, mean=v1element$mean, 
-						sd=sqrt(v1element$variance))
-				names(v2element) <- "intercept"
-			} else {
-				v2element <- mvrnorm(n=1, 
-						mu=v1element$mean, Sigma=v1element$covariance)
-			}
-			if ("logOddsAdjustment" %in% names(v1element))
-				v2element <- c(v2element, 
-						logOddsAdjustment=v1element$logOddsAdjustment)
-			attr(v2element, "type") <- "logistic model for probability"
-			
+		  ## check that v2old is of type logistic model for probability
+		  if(attr(v2old[[elementName]], "type")!="logistic model for probability")
+		    stop(paste0("v2 and v1distributions for parmaeter ", elementName, " are incompatible"))
+		  ## if v1element has attribute timeCutPoints 
+		  if(!is.null(attr(v1element, "timeCutPoints"))){
+		    if(length(v1element$mean$intercept)!=length(v2old[[elementName]]$intercept) | 
+		        length(v1element$mean$age)!=length(v2old[[elementName]]$age) |
+		        length(v1element$mean$aortaSize)!=length(v2old[[elementName]]$aortaSize))
+		       stop(paste0("Length of intercept, age and aortaSize from v1distribution$", elementName, "$mean not correct"))
+		    if(length(v1element$covariance) != length(v1element$mean$intercept))
+		      stop(paste0("Length of v1distribution$", elementName, "$covariance not correct"))
+		    
+		    require(MASS, quietly=TRUE)
+		    k <- length(v1element$mean$intercept)
+		    v2element <- as.list(mvrnorm(n=1, mu=sapply(v1element$mean, function(l) l[1]), Sigma=v1element$covariance[[1]]))
+		    for(kind in 2:k){
+		      nextv2 <- mvrnorm(n=1, mu=sapply(v1element$mean, function(l) l[kind]), Sigma=v1element$covariance[[kind]])
+		      for(z in 1:length(v2element)){
+		        v2element[[z]] <- c(v2element[[z]], nextv2[[z]])
+		      }
+		    }
+		    if ("logOddsAdjustment" %in% names(v1element))
+		      v2element$logOddsAdjustment <- v1element$logOddsAdjustment
+		    attr(v2element, "type") <- "logistic model for probability"
+		    attr(v2element, "timeCutPoints") <- attr(v1element, "timeCutPoints")
+		  } else {
+		    require(MASS, quietly=TRUE)
+		    if (length(v1element$mean) == 1) {
+		      v2element <- rnorm(n=1, mean=v1element$mean, 
+		                         sd=sqrt(v1element$variance))
+		      names(v2element) <- "intercept"
+		    } else {
+		      v2element <- mvrnorm(n=1, 
+		                           mu=v1element$mean, Sigma=v1element$covariance)
+		    }
+		    if ("logOddsAdjustment" %in% names(v1element))
+		      v2element <- c(v2element, 
+		                     logOddsAdjustment=v1element$logOddsAdjustment)
+		    attr(v2element, "type") <- "logistic model for probability"
+		  }  
 		} else if (type == "gamma pars for rate") {
+		  # check that v2old is a rate
+		  if(!(attr(v2old[[elementName]], "type") %in% c("rate", "reintervention rates")))
+		    stop(paste0("v2 and v1distributions for parmaeter ", elementName, " are incompatible"))
+		  ## if v2old has attribute timeCutPoints 
+		  if(!is.null(attr(v2old[[elementName]], "timeCutPoints"))){
+		    stop("timeCutPoints not yet implemented for rate input")
+		  }
 			v2element <- rgamma(n=1, 
 					shape=v1element$shape, scale=v1element$scale)
 			attr(v2element, "type") <- "rate"
 			
 		} else if (type == "gamma pars for multiple rates") {
+		  # check that v2old is of type reintervention rates
+		  if(attr(v2old[[elementName]], "type")!="reintervention rates")
+		    stop(paste0("v2 and v1distributions for parmaeter ", elementName, " are incompatible"))
+		  ## if v2old has attribute timeCutPoints 
+		  if(!is.null(attr(v2old[[elementName]], "timeCutPoints"))){
+		    stop("timeCutPoints not yet implemented for reintervention rates input")
+		  }		  
 		  v2element <- rgamma(n=length(v1element$shapes), 
 		                      shape=v1element$shapes, scale=v1element$scales)
 		  attr(v2element, "type") <- "reintervention rates"
 			
 		} else if (type == "pars for betaThenConvertThreeMonthProbToRate") {
+		  # check that v2old is a rate
+		  if(attr(v2old[[elementName]], "type")!="rate")
+		    stop(paste0("v2 and v1distributions for parmaeter ", elementName, " are incompatible"))
+		  ## if v2old has attribute timeCutPoints 
+		  if(!is.null(attr(v2old[[elementName]], "timeCutPoints"))){
+		    stop("timeCutPoints not yet implemented for rate input")
+		  }		  
 			v2element <- convertThreeMonthProbToRate(myRbeta(n=1, 
 					shape1=v1element$alpha, shape2=v1element$beta))
 			attr(v2element, "type") <- "rate"
 			
 		} else if (type == "pars for gammaThenMultiplyByFour") {
+		  # check that v2old is a rate
+		  if(attr(v2old[[elementName]], "type")!="rate")
+		    stop(paste0("v2 and v1distributions for parmaeter ", elementName, " are incompatible"))
+		  ## if v2old has attribute timeCutPoints 
+		  if(!is.null(attr(v2old[[elementName]], "timeCutPoints"))){
+		    stop("timeCutPoints not yet implemented for rate input")
+		  }		
+		  
 			v2element <- rgamma(n=1, 
 					shape=v1element$shape, scale=v1element$scale) * 4
 			attr(v2element, "type") <- "rate"
@@ -2748,10 +2828,6 @@ generateV2 <- function(v1distributions) {
 			"gamma", "alpha"))
 		attr(v2[[elementName]], "type") <- "par for aorta model"
 	
-	# if ("prevalenceDistribution" %in% names(v1other))
-	# 	stop("code in generateV2 for dealing with ",
-	# 			"v1other$prevalenceDistribution \n has not yet been written")
-	
 	return(v2)
 }
 
@@ -2775,13 +2851,6 @@ psaAboveDiagnosisThreshold <- function(v0, v1other, v1distributions, v2values,
 	# Set unspecified elements of v1other to default values
 	v1other <- setUnspecifiedElementsOfv1other(v1other)
 	
-	# Check the arguments.
-	checkArgs(v0=v0, v1other=v1other, v1distributions=v1distributions, personData=personData)
-	if(!is.null(v1other$qalyFactorBoundaries)){
-	  warning("Assuming startAge is 65 for everyone and calculating qalyFactorAgeBoundaries for you")
-	  v1other$qalyFactorAgeBoundaries <- 65 + v1other$qalyFactorBoundaries
-	  v1other$qalyFactorBoundaries <- NULL
-	}
 	
 	# Display messages, settings, parameters, etc.
 	cat("Running psa on ", Sys.info()["nodename"], " with:\n  ", 
@@ -2809,7 +2878,7 @@ psaAboveDiagnosisThreshold <- function(v0, v1other, v1distributions, v2values,
 	if (missing(v2values)) {  
 		setAndShowRandomSeed(v0$randomSeed, verbose=TRUE) 
 		v2values <- replicate(n=v0$numberOfParameterIterations, 
-				expr=generateV2(v1distributions), simplify=FALSE) 
+				expr=generateV2(v1distributions, v2), simplify=FALSE) 
 	} else {
 		npi <- v0$numberOfParameterIterations
 		if (!is.list(v2values) || !all(sapply(v2values, is.list)) ||
@@ -3841,13 +3910,29 @@ checkV2 <- function(v2) {
 				raiseV2TypeRelatedError(v2elementName)
 			
 		} else if (type == "probability") {
-			if (!isSingleNumeric(v2element) || v2element < 0 || v2element > 1)
-				raiseV2TypeRelatedError(v2elementName)
-			
+		  if(is.null(attr(v2element, "timeCutPoints"))){
+		    if (!isSingleNumeric(v2element) || v2element < 0 || v2element > 1)
+		      raiseV2TypeRelatedError(v2elementName)
+		  } else {
+		    if (length(v2element)!=(length(attr(v2element, "timeCutPoints"))+1) 
+		        || !is.numeric(v2element)
+		        || any(is.na(v2element))
+		        || any(v2element < 0) || any(v2element > 1))
+		      raiseV2TypeRelatedError(v2elementName)
+		  }			
 		} else if (type == "logistic model for probability") {
-			if (!is.numeric(v2element) || any(is.na(v2element)) || 
-					!hasNames(v2element))
-				raiseV2TypeRelatedError(v2elementName)
+		  if(is.null(attr(v2element, "timeCutPoints"))){
+		    if (!is.numeric(v2element) || any(is.na(v2element)) || 
+		        !hasNames(v2element))
+		      raiseV2TypeRelatedError(v2elementName)
+		  } else {
+		    if (any(lapply(v2element, length)!=(length(attr(v2element, "timeCutPoints"))+1)) 
+		        || !is.list(v2element)
+		        || any(sapply(v2element, function(i){any(is.na(i))}))
+		        || !hasNames(v2element)
+		        )
+		      raiseV2TypeRelatedError(v2elementName)
+		  }	
 			minimumLength <- { if (names(v2element)[length(v2element)] == 
 					"logOddsAdjustment") 2 else 1 }
 			if (length(v2element) < minimumLength) 

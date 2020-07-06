@@ -80,10 +80,14 @@ resultA <- AAA_DES(dataFile = NULL, n = n, extraInputs = list(v0 = v0, v1other =
 resultA$meanQuantities
 
 
-## Model B. Let's change the surveillance intervals to the following (2 year 3.0-4.4, 6 months 4.5-5.4)
+## Model B. Let's change the surveillance intervals to the following:
+## 2 years <3.0cm (once in surveillance)
+## 2 year 3.0-4.4, 
+## 6 months 4.5-5.4,
+## No surveillance for contraindicated (monitoring interval = Inf)
 v0$returnEventHistories <- FALSE
 v1other$aortaDiameterThresholds <- c(3, 4.5, 5.5)
-v1other$monitoringIntervals <- c(2, 2, 0.5)
+v1other$monitoringIntervals <- c(2, 2, 0.5, Inf)
 resultB <- AAA_DES(dataFile = NULL, n = n, extraInputs = list(v0 = v0, v1other = v1other, v1distributions = v1distributions, v2 = v2), personData=personData)
 resultB$meanQuantities
 
