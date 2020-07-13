@@ -100,13 +100,12 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
   }
   
   ## Input Data for the DES model
-  if(!require(readxl)){
-    install.packages("readxl")
-  }
+  ## Install required packages if not already installed
+  list.of.packages <- c("readxl", "tibble")
+  new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+  if(length(new.packages)) install.packages(new.packages)
+  
   library(readxl)
-  if(!require(tibble)){
-    install.packages("tibble")
-  }
   library(tibble)
   
   ## Main Data Items
@@ -446,9 +445,11 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
 ################################################################################
 processPersons <- function(v0, v1other, v2, personData=NULL) {
 	
-	
-	suppressWarnings(suppressMessages(require(doParallel)))
-	
+  ## Install required packages if not already installed
+  list.of.packages <- c("doParallel", "msm")
+  new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+  if(length(new.packages)) install.packages(new.packages)
+  
 	# Set unspecified elements of v0 to default values, if necessary. 
 	v0 <- setUnspecifiedElementsOfv0(v0)
 	
@@ -574,6 +575,7 @@ processPersons <- function(v0, v1other, v2, personData=NULL) {
 				FUN=processOnePair, v0, v1other, v2, personData)
 		
 	} else if (v0$method == "parallel") {
+	  require("parallel", quietly = T)
 		cluster <- makeCluster(v0$numberOfProcesses)  
 		clusterExport(cluster, getAllFunctionsAndStringsInGlobalEnv())
 		setAndShowRandomSeed(randomSeed=v0$randomSeed, cluster=cluster, 
@@ -583,6 +585,7 @@ processPersons <- function(v0, v1other, v2, personData=NULL) {
 		stopCluster(cluster) 
 		
 	} else if (v0$method == "foreach") {
+	  require("doParallel", quietly = T)
 		if (!is.null(v0$randomSeed)) 
 			stop("v0$randomSeed does not yet work with v0$method=\"foreach\"")
 		registerDoParallel(cores=v0$numberOfProcesses)
@@ -874,12 +877,6 @@ processPersonsControlOnly <- function(v0, v1other, v2, updateProgress=NULL, pers
   cat("probOfAaaDeathInInitialPeriodAfterElectiveOpenSurgery:\n")
   print(v2$probOfAaaDeathInInitialPeriodAfterElectiveOpenSurgery)
   
-  # Load packages, etc.
-  suppressWarnings(suppressMessages(require(doParallel)))
-  # suppressMessages is for the Revolution R message and suppressWarnings 
-  # is for the warning that "foreach" was built under R version something.
-  # doParallel loads parallel and foreach.
-  
   # Set unspecified elements of v0 to default values, if necessary. 
   v0 <- setUnspecifiedElementsOfv0(v0)
   
@@ -1022,6 +1019,8 @@ processPersonsControlOnly <- function(v0, v1other, v2, updateProgress=NULL, pers
                                   FUN=processOnePair, v0, v1other, v2, personData)
     
   } else if (v0$method == "parallel") {
+    require(parallel, quietly = T)
+    
     # Do it using parLapply. 
     v0$treatmentGroups <- "noScreening"
     cluster <- makeCluster(v0$numberOfProcesses)  # previously: outfile=""
@@ -1033,6 +1032,8 @@ processPersonsControlOnly <- function(v0, v1other, v2, updateProgress=NULL, pers
     stopCluster(cluster) 
     
   } else if (v0$method == "foreach") {
+    require(doParallel, quietly = T)
+    
     v0$treatmentGroups <- "noScreening"
     if (!is.null(v0$randomSeed)) 
       stop("v0$randomSeed does not yet work with v0$method=\"foreach\"")
@@ -2701,14 +2702,19 @@ generateV2 <- function(v1distributions, v2old) {
 		  # check that v2old is a rate
 		  if(!(attr(v2old[[elementName]], "type") %in% c("rate", "reintervention rates")))
 		    stop(paste0("v2 and v1distributions for parmaeter ", elementName, " are incompatible"))
-		  ## if v2old has attribute timeCutPoints 
-		  if(!is.null(attr(v2old[[elementName]], "timeCutPoints"))){
-		    stop("timeCutPoints not yet implemented for rate input")
-		  }
-			v2element <- rgamma(n=1, 
-					shape=v1element$shape, scale=v1element$scale)
-			attr(v2element, "type") <- "rate"
-			
+		  if(!is.null(attr(v1element, "timeCutPoints"))){
+		    if(length(v1element$shape)!=length(v1element$scale) | 
+		       length(v1element$shape)!=(length(attr(v1element, "timeCutPoints"))+1))
+		      stop(paste0("Length of shape and scale from v1distribution$", elementName, " not correct"))
+		    v2element <- rgamma(n=length(v1element$shape), 
+		                         shape=v1element$shape, scale=v1element$scale)
+		    attr(v2element, "type") <- "rate"
+		    attr(v2element, "timeCutPoints") <- attr(v1element, "timeCutPoints")
+		  } else {
+		    v2element <- rgamma(n=1, 
+		                        shape=v1element$shape, scale=v1element$scale)
+		    attr(v2element, "type") <- "rate"
+		  }			
 		} else if (type == "gamma pars for multiple rates") {
 		  # check that v2old is of type reintervention rates
 		  if(attr(v2old[[elementName]], "type")!="reintervention rates")
@@ -3355,8 +3361,17 @@ generateTimeToNonAaaDeathFromContraindication <- function(
 
 # A function for generating a dropout time.
 generateDropoutTime <- function(monitoringStartTime, rateOfDropoutFromMonitoring, v3) {
-	time <- monitoringStartTime + qexp(v3[["rateOfDropoutFromMonitoring"]][1], rate=rateOfDropoutFromMonitoring)
-	v3[["rateOfDropoutFromMonitoring"]] <- v3[["rateOfDropoutFromMonitoring"]][-1]
+  if(is.null(attr(rateOfDropoutFromMonitoring, "timeCutPoints"))){
+    time <- monitoringStartTime + qexp(v3[["rateOfDropoutFromMonitoring"]][1], rate=rateOfDropoutFromMonitoring)
+  } else {
+    start <- as.numeric(monitoringStartTime)
+    timeCutPoints <- c(0, (attr(rateOfDropoutFromMonitoring, "timeCutPoints") - start)[attr(rateOfDropoutFromMonitoring, "timeCutPoints") >=  monitoringStartTime])
+    l1 <- length(timeCutPoints)
+    l2 <- length(rateOfDropoutFromMonitoring)
+    rates <- rateOfDropoutFromMonitoring[(l2-l1+1):l2]
+    time <- monitoringStartTime + msm::qpexp(v3[["rateOfDropoutFromMonitoring"]][1], rate=rates, t=timeCutPoints)  
+	}
+  v3[["rateOfDropoutFromMonitoring"]] <- v3[["rateOfDropoutFromMonitoring"]][-1]
 	return(list(time = time, v3 =v3))
 }
 
@@ -3377,7 +3392,7 @@ setUnspecifiedElementsOfv0 <- function(v0) {
 			randomSeed=2,
 			numberOfPersons=1e3,
 			numberOfParameterIterations=5,
-			numberOfProcesses=detectCores()-1
+			numberOfProcesses=parallel::detectCores()-1
 	)
 	for (i in 1:length(defaults)) {
 		varName <- names(defaults)[i]
@@ -3904,6 +3919,7 @@ checkV2 <- function(v2) {
 			print(v2element)
 			stop("v2$", v2elementName, " is illegal in some way")
 		}
+	
 		
 		if (type == "fixed value") {
 			if (is.na(v2element) || length(v2element) == 0)
@@ -3943,8 +3959,16 @@ checkV2 <- function(v2) {
 				raiseV2TypeRelatedError(v2elementName)
 			
 		} else if (type == "rate") {
-			if (!isSingleNumeric(v2element) || v2element < 0)
-				raiseV2TypeRelatedError(v2elementName)
+		  if(is.null(attr(v2element, "timeCutPoints"))){
+		    if (!isSingleNumeric(v2element) || v2element < 0)
+		      raiseV2TypeRelatedError(v2elementName)
+		  } else {
+		    if (length(v2element)!=(length(attr(v2element, "timeCutPoints"))+1) 
+		        || !is.numeric(v2element)
+		        || any(is.na(v2element))
+		        || any(v2element < 0))
+		      raiseV2TypeRelatedError(v2elementName)
+		  }	
 			
 		} else if (type == "par for aorta model") {
 			# It must be a single numeric.
