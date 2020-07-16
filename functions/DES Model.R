@@ -120,10 +120,16 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
     growthData <- subset(growthData, !is.na(growthData$varname))
     
     ## AAA Size Distribution
-    v1other$baselineDiameters <- read_excel(dataFile, sheet = "AAA Size Distribution",  
-                                            col_names = T, skip = 4)
-    names(v1other$baselineDiameters) <- c("size", "weight")
-    v1other$baselineDiameters <- subset(v1other$baselineDiameters, !is.na(v1other$baselineDiameters$size))
+    # use baselineDiameters in Excel file only if not specified in personData
+    if(!("baselineDiameter" %in% names(personData))){
+      v1other$baselineDiameters <- read_excel(dataFile, sheet = "AAA Size Distribution",  
+                                              col_names = T, skip = 4)
+      names(v1other$baselineDiameters) <- c("size", "weight")
+      v1other$baselineDiameters <- subset(v1other$baselineDiameters, !is.na(v1other$baselineDiameters$size))
+    } else {
+      cat("Using baseline aorta distribution as specified in personData \n")
+      v1other$baselineDiameters <- NULL
+    }
     
     ## Model parameters
     modelParameters <- read_excel(dataFile, sheet = "Model Parameters", range="A6:D200", 
@@ -486,7 +492,15 @@ processPersons <- function(v0, v1other, v2, personData=NULL) {
 	if(is.null(personData$prob)){
 	  personData$prob <- 1
 	}
-	
+	## If baselineDiameter is specified in personData then prevalence cannot be specified
+	if("baselineDiameter" %in% names(personData) & !is.null(v2$prevalence))
+	  stop("You cannot currently specify v2$prevalence and include aortaSize in personData.
+	       Either include aorta distribution in v1other$baselineDiameters or manually reweight aorta distribution in
+	       personData$aortaSize to give required prevalence")
+	## Set v1other$baselineDiameter to NULL if baselineDiameter is specified in personData
+	if("baselineDiameter" %in% names(personData)){
+	  v1other$baselineDiameters <- NULL  
+	}
 	# Display v0, v1other, and v2
 	if (v0$verbose) {
 		cat("Running processPersons on ", Sys.info()["nodename"], 
@@ -529,24 +543,30 @@ processPersons <- function(v0, v1other, v2, personData=NULL) {
 	v2$ultrasoundMeasurementErrorSD <- v2$sigmaW
 	
 	# Change the prevalence, if v2$prevalence exists.
-	if ("prevalence" %in% names(v2)) {
-		v2$baselineDiametersWithDesiredPrevalence <- 
-			changePrevalence(baselineDiameters=v1other$baselineDiameters, 
-			threshold=v1other$prevalenceThreshold, prevalence=v2$prevalence)
-		if (v0$verbose)
-			cat("Prevalence (in v2$baselineDiametersWithDesiredPrevalence) ",
-				"has been\n changed to ", v2$prevalence, 
-				", using threshold=v1other$prevalenceThreshold=",
-				v1other$prevalenceThreshold, ".\n", sep="")
-	} else {
-		v2$baselineDiametersWithDesiredPrevalence <- v1other$baselineDiameters
-		if (v0$verbose) cat("v2$prevalence does not exist, so \n",
-				" v2$baselineDiametersWithDesiredPrevalence is just a copy of",
-				" v1other$baselineDiameters.\n", sep="")
+	if(!("baselineDiameter" %in% names(personData))){
+	  if ("prevalence" %in% names(v2)) {
+	    v2$baselineDiametersWithDesiredPrevalence <- 
+	      changePrevalence(baselineDiameters=v1other$baselineDiameters, 
+	                       threshold=v1other$prevalenceThreshold, prevalence=v2$prevalence)
+	    if (v0$verbose)
+	      cat("Prevalence (in v2$baselineDiametersWithDesiredPrevalence) ",
+	          "has been\n changed to ", v2$prevalence, 
+	          ", using threshold=v1other$prevalenceThreshold=",
+	          v1other$prevalenceThreshold, ".\n", sep="")
+	  } else {
+	    v2$baselineDiametersWithDesiredPrevalence <- v1other$baselineDiameters
+	    if (v0$verbose) cat("v2$prevalence does not exist, so \n",
+	                        " v2$baselineDiametersWithDesiredPrevalence is just a copy of",
+	                        " v1other$baselineDiameters.\n", sep="")
+	  }
+	  v2$baselineDiametersWithDesiredPrevalence <- setType(
+	    v2$baselineDiametersWithDesiredPrevalence, 
+	    "baseline diameters with desired prevalence")
+	  # Check the arguments.
+	  if (!("weight" %in% names(v2$baselineDiametersWithDesiredPrevalence)))
+	    stop("v2$baselineDiametersWithDesiredPrevalence must have a ",
+	         "\"weight\" column")
 	}
-	v2$baselineDiametersWithDesiredPrevalence <- setType(
-			v2$baselineDiametersWithDesiredPrevalence, 
-			"baseline diameters with desired prevalence")
 	
 	# Set v1other$thresholdForIncidentalDetection to 
 	# v1other$aortaDiameterThresholds[1], if the former was not set. 
@@ -646,6 +666,10 @@ processPersonsAboveDiagnosisThreshold <- function(v0, v1other, v2,
   
   # Set unspecified elements of v1other to default values
   v1other <- setUnspecifiedElementsOfv1other(v1other)
+  
+  if("baselineDiameter" %in% names(personData))
+    stop("Selective sampling above diagnosis threshold not currently implemented if baseline aorta diameter is
+         specified in personData. Please use v1other$baselineDiameters instead.")
   
 	## Weighting of baseline distribution outside of processPersons 
 	# Change the prevalence, if v2$prevalence exists.
@@ -765,7 +789,8 @@ processOnePair <- function(personNumber, v0, v1other, v2, personData) {
 	dataItem <- personData[sample.int(dim(personData)[1], 1, prob=personData$prob),,drop=F]
 	#dataItem <- personData[1,,drop=F]
 
-	aortaGrowthParameters <- generatePersonAortaParameters(v1other, v2)
+	y0 <- dataItem$baselineDiameter
+	aortaGrowthParameters <- generatePersonAortaParameters(v1other, v2, y0 = y0)
 	# Patient characteristics from dataItem
 	v3 <- c(as.list(dataItem), compactList(
 	  # Characteristics:
@@ -1243,17 +1268,12 @@ processPersonsControlOnly <- function(v0, v1other, v2, updateProgress=NULL, pers
 # This linear mixed model for log-diameter samples baseline diameter from a distribution, 
 # which may or may not be weighted, then generates from a model with random slope. 
 ################################################################################
-generatePersonAortaParameters <- function(v1other, v2) {  # (person not persons)
-	# Check the arguments.
-	if (!("baselineDiametersWithDesiredPrevalence" %in% names(v2)))
-		stop("v2 must contain baselineDiametersWithDesiredPrevalence")
-	if (!("weight" %in% names(v2$baselineDiametersWithDesiredPrevalence))) 
-		stop("v2$baselineDiametersWithDesiredPrevalence must have a ",
-				"\"weight\" column")
+generatePersonAortaParameters <- function(v1other, v2, y0 = NULL) {  # (person not persons)
 	
 	# Generate y0.
-	y0 <- sample(x=v2$baselineDiametersWithDesiredPrevalence$size, size=1, 
-			prob=v2$baselineDiametersWithDesiredPrevalence$weight)
+  if(is.null(y0))  
+    y0 <- sample(x=v2$baselineDiametersWithDesiredPrevalence$size, size=1, 
+                 prob=v2$baselineDiametersWithDesiredPrevalence$weight)
 	
 	# b0 is set to log(y0) for y0<3
 	# b1 is generated from a conditional distribution given b0 using rnorm 
@@ -1586,6 +1606,7 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			numberMonitor[aortaSizeGroup + 1] <- numberMonitor[aortaSizeGroup + 1] + 1
 			## If numberMonitor <= maxNumberMonitor then schedule another monitor else discharge from surveillance
 			## Last group has Inf number of monitors. This corresponds with large AAA group
+	
 			if (numberMonitor[aortaSizeGroup + 1] < c(v1other$maxNumberMonitor, Inf)[aortaSizeGroup + 1]){
 			  if (aortaSizeGroup == 0) {  # they are below lowest threshold
 			    eventHistory <- addEvent(eventHistory, 
@@ -3596,7 +3617,7 @@ checkArgs <- function(v0, v1other, v1distributions, v2, personData) {
 	## Check personData if not null
 	if (!is.null(personData)){
 	  if(class(personData)!="data.frame") stop("personData must be a data.frame")
-	  if(any(!(colnames(personData) %in% c("startAge", "aortaSize", "prob")))) stop("The columns of personData must be named one of startAge, aortaSize and prob")
+	  if(any(!(colnames(personData) %in% c("startAge", "baselineDiameter", "prob")))) stop("The columns of personData must be named one of startAge, baselineDiameter and prob")
 	}
 }
 

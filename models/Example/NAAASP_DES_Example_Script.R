@@ -34,7 +34,7 @@ v1distributions
 # Add some more DES operational parameters for this specific run of the model
 v0$returnEventHistories <- F ## To save memory we will not return individual event histories
 v0$returnAllPersonsQuantities <- F ## To save memory we will not return individual HE quantitites
-v0$method <- "parallel" ## Use v0$method = "parallel" to fit the DES using parallel processing. This works best with larger n, as there is a cost to set up parallel processing initially
+v0$method <- "serial" ## Use v0$method = "parallel" to fit the DES using parallel processing. This works best with larger n, as there is a cost to set up parallel processing initially
 
 
 ## Number of patients-pairs
@@ -45,7 +45,6 @@ n <- 1e4 ## Ideally, this should be large (~10 million) and run on a supercomput
 ## This should contain the distribution of ages at invitation to screening (in the column startAge) and probability weights (in the column prob)
 ## If prob is missing then the DES will sample with replacement from every row of the data.frame with equal probability
 ## If everyone is aged 65 at invitation to screening then we just need to specify the following data.frame
-## In time, further patient characteristics will be incorporated within this file (such as aortaSize). This will allow, for example an age by aortaSize joint distribution to be sampled
 personData <- data.frame(startAge = 65)
 
 ## We now run the model using the AAA_DES function
@@ -75,9 +74,21 @@ resultA.eventHistories$eventHistories[1:10]
 
 ## AAA_DES is a wrapper for the function processPersons and usually calls it twice, first to get absolute effects for the control group, then to get incremental effects (between invited and control)
 ## If we are only interested in the incremental effects we can run the model faster by specifying incrementalOnly = TRUE
+v0$returnEventHistories <- FALSE
 resultA <- AAA_DES(dataFile = NULL, n = n, extraInputs = list(v0 = v0, v1other = v1other, v1distributions = v1distributions, v2 = v2), 
                    personData = personData, incrementalOnly = TRUE)
 resultA$meanQuantities
+
+## Using personData with other patient characteristics
+## personData can also be used to specify other patient characteristics, such as the baseline aorta distribution
+## This can be specified in personData and will supersede inputs in v1other$baselineDiameters or in the DES_Input_Definitions.xlsx file
+## Any data specified in personData will automatically be sampled jointly
+## That is sampling will be done row-wise to allow the user to specify joint distributions of patient characteristics
+## Cannot use selectiveSampling currently with this specification
+personData <- data.frame(startAge = 65, baselineDiameter = v1other$baselineDiameters$size, prob = v1other$baselineDiameters$weight)
+resultA.newSpec <- AAA_DES(dataFile, n = n, extraInputs = list(v0 = v0), personData = personData, selectiveSampling = FALSE)
+resultA.newSpec$meanQuantities
+
 
 
 ## Model B. Let's change the surveillance intervals to the following:
@@ -85,6 +96,7 @@ resultA$meanQuantities
 ## 2 year 3.0-4.4, 
 ## 6 months 4.5-5.4,
 ## No surveillance for contraindicated (monitoring interval = Inf)
+personData <- data.frame(startAge = 65)
 v0$returnEventHistories <- FALSE
 v1other$aortaDiameterThresholds <- c(3, 4.5, 5.5)
 v1other$monitoringIntervals <- c(2, 2, 0.5, Inf)
