@@ -394,9 +394,13 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
   Either turn off selective sampling (selectiveSampling = FALSE)  
   or set v0$returnEventHistories = FALSE")
       }
-   
+      thresh <- ifelse(is.null(attr(v1other$aortaDiameterThresholds, "timeCutPoints")), 
+                               v1other$aortaDiameterThresholds[1],
+                               v1other$aortaDiameterThresholds[[1]][1])
+      if(!is.null(attr(v1other$aortaDiameterThresholds, "timeCutPoints")))
+         cat("Time-varying thresholds given as input, assuming prevalence threshold is v1other$aortaDiameterThresholds[[1]][1]")
       res.sampled<-processPersonsAboveDiagnosisThreshold(v0, v1other, v2, 
-                                                         threshold=v1other$aortaDiameterThresholds[1], personData = personData)
+                                                         threshold=thresh, personData = personData)
       
       ## Run model once using point estimates
       if(incrementalOnly == FALSE){
@@ -418,7 +422,7 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
     ## Run PSA
     #result <- psa(v0, v1other, v1distributions)
     result <- psaAboveDiagnosisThreshold(v0, v1other, v1distributions, 
-                               threshold = v1other$aortaDiameterThresholds[1], personData = personData)
+                               threshold = thresh, personData = personData)
     return(result)
   }
 }
@@ -472,6 +476,12 @@ processPersons <- function(v0, v1other, v2, personData=NULL) {
 	v1other$monitoringIntervalFollowingContraindicationSuspensionTime <- v1other$monitoringIntervalsSuspensionTime[length(v1other$monitoringIntervalsSuspensionTime)]
 	v1other$monitoringIntervalsSuspensionTime <- v1other$monitoringIntervalsSuspensionTime[-length(v1other$monitoringIntervalsSuspensionTime)]
 	
+	## Set v1other$aortaDiameterThreshold to be a list if not already
+	if(!is.list(v1other$aortaDiameterThresholds)){
+	  v1other$aortaDiameterThresholds <- list(v1other$aortaDiameterThresholds)
+	  warning("v1other$aortaDiameterThresholds should now be given as a list, e.g. list(c(3, 4.5, 5.5))")
+	}
+	
 	# Check the arguments.
 	checkArgs(v0=v0, v1other=v1other, v2=v2, personData=personData)
 	if(!is.null(v1other$qalyFactorBoundaries)){
@@ -501,6 +511,7 @@ processPersons <- function(v0, v1other, v2, personData=NULL) {
 	if("baselineDiameter" %in% names(personData)){
 	  v1other$baselineDiameters <- NULL  
 	}
+	
 	# Display v0, v1other, and v2
 	if (v0$verbose) {
 		cat("Running processPersons on ", Sys.info()["nodename"], 
@@ -569,14 +580,14 @@ processPersons <- function(v0, v1other, v2, personData=NULL) {
 	}
 	
 	# Set v1other$thresholdForIncidentalDetection to 
-	# v1other$aortaDiameterThresholds[1], if the former was not set. 
+	# v1other$aortaDiameterThresholds[[1]], if the former was not set. 
 	if (!("thresholdForIncidentalDetection" %in% names(v1other))) {
-		v1other$thresholdForIncidentalDetection <- 
-				v1other$aortaDiameterThresholds[1]
+	  thresh <- v1other$aortaDiameterThresholds[[1]][1]
+	  v1other$thresholdForIncidentalDetection <- thresh
 		if (v0$verbose) cat("v1other$thresholdForIncidentalDetection was not ",
 				"provided and so\n has been set to ",
-				"v1other$aortaDiameterThresholds[1]=", 
-				v1other$aortaDiameterThresholds[1], ".\n", sep="")
+				"v1other$aortaDiameterThresholds[[1]][1]=", 
+				thresh, ".\n", sep="")
 	}
 	
 	# Make a list to store the output in. 
@@ -918,6 +929,12 @@ processPersonsControlOnly <- function(v0, v1other, v2, updateProgress=NULL, pers
   v1other$monitoringIntervalFollowingContraindicationSuspensionTime <- v1other$monitoringIntervalsSuspensionTime[length(v1other$monitoringIntervalsSuspensionTime)]
   v1other$monitoringIntervalsSuspensionTime <- v1other$monitoringIntervalsSuspensionTime[-length(v1other$monitoringIntervalsSuspensionTime)]
   
+  ## Set v1other$aortaDiameterThreshold to be a list if not already
+  if(!is.list(v1other$aortaDiameterThresholds)){
+    v1other$aortaDiameterThresholds <- list(v1other$aortaDiameterThresholds)
+    warning("v1other$aortaDiameterThresholds should now be given as a list, e.g. list(c(3, 4.5, 5.5))")
+  }
+  
   # Check the arguments.
   checkArgs(v0=v0, v1other=v1other, v2=v2, personData=personData)
   if(!is.null(v1other$qalyFactorBoundaries)){
@@ -1002,24 +1019,17 @@ processPersonsControlOnly <- function(v0, v1other, v2, updateProgress=NULL, pers
   v2$baselineDiametersWithDesiredPrevalence <- setType(
     v2$baselineDiametersWithDesiredPrevalence, 
     "baseline diameters with desired prevalence")
-  # NB if the user specifies v2$prevalence, then changePrevalence is done 
-  # using threshold=v1other$aortaDiameterThresholds[1], not
-  # v1other$thresholdForIncidentalDetection. (For the exact meaning of 
-  # "threshold" see changePrevalence, though it is fairly obvious).
-  # If you think that changePrevalence should be done using threshold=
-  # v1other$thresholdForIncidentalDetection, or if you think that the user should 
-  # be allowed or forced to specify threshold when they specify 
-  # v2$prevalence, then the code above and elsewhere will need to change. 
+ 
   
   # Set v1other$thresholdForIncidentalDetection to 
   # v1other$aortaDiameterThresholds[1], if the former was not set. 
   if (!("thresholdForIncidentalDetection" %in% names(v1other))) {
-    v1other$thresholdForIncidentalDetection <- 
-      v1other$aortaDiameterThresholds[1]
+    thresh <- v1other$aortaDiameterThresholds[[1]][1]
+    v1other$thresholdForIncidentalDetection <- thresh
     if (v0$verbose) cat("v1other$thresholdForIncidentalDetection was not ",
                         "provided and so\n has been set to ",
-                        "v1other$aortaDiameterThresholds[1]=", 
-                        v1other$aortaDiameterThresholds[1], ".\n", sep="")
+                        "v1other$aortaDiameterThresholds[[1]][1]=", 
+                        thresh, ".\n", sep="")
   }
   
   # Make a list to store the output in. 
@@ -1507,7 +1517,7 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 	  scheduledEvents["censored"] <- v3$censoringTime
 	
 	## Set numberMonitor = number of times in each size group that monitoring has occurred. Include large AAA group here as well
-	numberMonitor <- rep(0,length(v1other$aortaDiameterThresholds)+1)
+	numberMonitor <- rep(0,length(v1other$aortaDiameterThresholds[[1]])+1)
 	
 	repeat {
 	  # Make sure that all the scheduled times are different (exclude NAs and Infinities -- MS added 24/07/2019).
@@ -1526,6 +1536,9 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 	
 		eventHistory <- addEvent(eventHistory, eventType, eventTime)
 		scheduledEvents[eventType] <- NA 
+
+    ## Define aortaDiameterThresholds once for this loop
+		aDT <- v1other$aortaDiameterThresholds[[findInterval(eventTime, c(0, attr(v1other$aortaDiameterThresholds, "timeCutPoints")))]]
 	
 		# Update scheduledEvents as appropriate based on what eventType is.
 		if (eventType=="inviteToScreen") {
@@ -1568,8 +1581,7 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 						eventTime)
 			
 			# Find what interval aortaSize is in & schedule events accordingly.
-			aortaSizeGroup <- findInterval(aortaSize, 
-					v1other$aortaDiameterThresholds)
+			aortaSizeGroup <- findInterval(aortaSize,	aDT)
 			## Add one to the times patient has been screened or monitored in this size group
 			numberMonitor[aortaSizeGroup + 1] <- numberMonitor[aortaSizeGroup + 1] + 1
 			
@@ -1579,7 +1591,7 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			                                         v2$rateOfIncidentalDetection)
 			  scheduledEvents["incidentalDetection"] <- gID$time
 			  v3 <- gID$v3
-			} else if (aortaSizeGroup < length(v1other$aortaDiameterThresholds)) {
+			} else if (aortaSizeGroup < length(v1other$aortaDiameterThresholds[[1]])) {
 			  scheduledEvents["monitor"] <- 
 						max(v1other$monitoringIntervalsSuspensionTime[aortaSizeGroup+1], eventTime + v1other$monitoringIntervals[aortaSizeGroup+1]) 
 			  gD <- generateDropoutTime(eventTime, 
@@ -1600,8 +1612,7 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 				trueSize <- getAortaMeasurement(v3, eventTime, method="exact")
 				eventHistory <- recordSize(eventHistory, trueSize, aortaSize)
 			}
-			aortaSizeGroup <- findInterval(aortaSize, 
-					v1other$aortaDiameterThresholds)
+			aortaSizeGroup <- findInterval(aortaSize, aDT)
 			## Add one to the times patient has been screened or monitored in this size group
 			numberMonitor[aortaSizeGroup + 1] <- numberMonitor[aortaSizeGroup + 1] + 1
 			## If numberMonitor <= maxNumberMonitor then schedule another monitor else discharge from surveillance
@@ -1613,7 +1624,7 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 			                             "aortaDiameterBelowThreshold", eventTime)
 			    scheduledEvents["monitor"] <- 
 			      max(v1other$monitoringIntervalsSuspensionTime[1], eventTime + v1other$monitoringIntervals[1]) 
-			  } else if (aortaSizeGroup < length(v1other$aortaDiameterThresholds)) {
+			  } else if (aortaSizeGroup < length(v1other$aortaDiameterThresholds[[1]])) {
 			    scheduledEvents["monitor"] <- 
 			      max(v1other$monitoringIntervalsSuspensionTime[aortaSizeGroup+1], eventTime + v1other$monitoringIntervals[aortaSizeGroup+1]) 
 			  } else {
@@ -1638,13 +1649,12 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 				trueSize <- getAortaMeasurement(v3,eventTime,method="exact")
 				eventHistory <- recordSize(eventHistory, trueSize,aortaSize)
 			}
-			aortaSizeGroup <- findInterval(aortaSize, 
-					v1other$aortaDiameterThresholds)
+			aortaSizeGroup <- findInterval(aortaSize, aDT)
 			gBV <- getBinaryVariable("probOfContraindication", v1other, v2, v3, eventTime)
 			contraindication <- gBV$result
 			v3 <- gBV$v3
 			
-			if (aortaSizeGroup < length(v1other$aortaDiameterThresholds)) {
+			if (aortaSizeGroup < length(v1other$aortaDiameterThresholds[[1]])) {
 				eventHistory <- addEvent(eventHistory, 
 						"decideOnReturnToMonitoring", eventTime)
 				scheduledEvents["monitor"] <- 
@@ -1870,7 +1880,7 @@ generateEventHistory <- function(v0, v1other, v2, v3, treatmentGroup) {
 		} else if (eventType == "dropout" | eventType == "discharged") {
 			scheduledEvents["monitor"] <- NA
 			## Reset numberMonitor to zero so that if they get incidentally detected they start afresh
-			numberMonitor <- rep(0,length(v1other$aortaDiameterThresholds)+1)
+			numberMonitor <- rep(0,length(v1other$aortaDiameterThresholds[[1]])+1)
 			gID <- generateIncidentalDetectionTime(eventTime, 
 			                                       v1other$thresholdForIncidentalDetection, v3, 
 			                                       v2$rateOfIncidentalDetection)
@@ -3671,20 +3681,28 @@ checkV1other <- function(v1other) {
   if(!is.null(v1other$qalyFactorBoundaries)){
     warning("v1other$qalyFactorBoundaries are deprecated. Please specify ages directly using v1other$qalyFactorAgeBoundaries")
   }  
-  
 	# Check v1other$aortaDiameterThresholds and v1other$monitoringIntervals.
-	if (length(v1other$aortaDiameterThresholds) != 
-			length(v1other$monitoringIntervals)) ## updated MS 07/02/19
-		stop("v1other$aortaDiameterThresholds must be the same length as v1other$monitoringIntervals. \n
+  if(is.null(attr(v1other$aortaDiameterThresholds, "timeCutPoints"))){
+    if (length(v1other$aortaDiameterThresholds[[1]]) != 
+        length(v1other$monitoringIntervals)) ## updated MS 07/02/19
+      stop("v1other$aortaDiameterThresholds must be the same length as v1other$monitoringIntervals. \n
 		     The first element of v1other$monitoringIntervals should be the monitoring interval for AAA in surveillance who drop below first diameter threshold \n
 		     The last element of v1other$monitoringIntervals should be the monitoring interval for contraindicated AAA")
-	if (!identical(v1other$aortaDiameterThresholds, 
-			sort(v1other$aortaDiameterThresholds)))
-		stop("v1other$aortaDiameterThresholds must be in increasing order")
-	if (!identical(v1other$monitoringIntervals, 
-			sort(v1other$monitoringIntervals, decreasing=TRUE)))
-		stop("v1other$monitoringIntervals must be in decreasing order")
-	
+    if (!identical(v1other$aortaDiameterThresholds[[1]], 
+                   sort(v1other$aortaDiameterThresholds[[1]])))
+      stop("v1other$aortaDiameterThresholds must be in increasing order")
+   
+  }	else {
+    ## Check that timeCutPoints and aortaDiameterThresholds are the correct length
+    if (length(v1other$aortaDiameterThresholds)!=(length(attr(v1other$aortaDiameterThresholds, "timeCutPoints"))+1)) 
+        stop("v1other$monitoringIntervals should be a list with length one greater than timeCutPoints")
+    for(i in v1other$aortaDiameterThresholds){
+      if(!identical(i, sort(i))) stop("v1other$aortaDiameterThresholds must be in increasing order") 
+    }
+    test <- sapply(v1other$aortaDiameterThresholds, length)
+    if(!all.equal( max(test) ,min(test))) stop("All elements of v1other$aortaDiameterThresholds must be the same length")
+  }
+  
   # Check if suspension times for monitoring exist
   # If they do, check they are of correct length
   if(!is.null(v1other$monitoringIntervalsSuspensionTime)){
@@ -4291,7 +4309,7 @@ countDropouts <- function(personsInfo, v1other, timeLimit=NA) {
 		if ("screen" %in% eventHistory$events && 
 				!("nonvisualization" %in% eventHistory$events) &&
 				eventHistory$measuredSizes[match("screen", 
-				eventHistory$events)] >= v1other$aortaDiameterThresholds[1]) {
+				eventHistory$events)] >= v1other$aortaDiameterThresholds[[1]]) {
 
 			if (is.na(timeLimit)) { 
 				if ("dropout" %in% eventHistory$events)
