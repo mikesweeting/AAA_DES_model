@@ -345,7 +345,7 @@ eventsPlot<-function(data,event,v1other){
     lims(x = xlim,y = ylim)+
     geom_hline(yintercept=c(diag.thresh,inter.thresh),linetype=2)+
     xlab("Time since screening (years)")+
-    ylab("Aorta size (cm)")+guides(alpha=guide_legend(title="Density"))+scale_fill_viridis()
+    ylab("Aorta size (cm)")+guides(alpha=guide_legend(title="Density"))+scale_fill_viridis_c()
   
 }  
 

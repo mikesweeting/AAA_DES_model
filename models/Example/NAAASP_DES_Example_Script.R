@@ -71,6 +71,29 @@ resultA.eventHistories <- AAA_DES(dataFile = NULL, n = n, extraInputs = list(v0 
 resultA.eventHistories$meanQuantities
 ## Listing the first 10 patient-pair event histories
 resultA.eventHistories$eventHistories[1:10]
+## Storing events in a data.frame
+resultA.event.data.frame <- eventsData(resultA.eventHistories)
+## Plotting when ruptures occurs
+library(ggplot2)
+eventsPlot(resultA.event.data.frame, "rupture", v1other)
+## Using dplyr to summarise when ruptures occur, and last event before rupture
+library(dplyr)
+ruptures <- resultA.event.data.frame %>% group_by(treatmentGroup, person) %>%
+  filter(any(event=="rupture")) %>%
+  arrange(person, treatmentGroup, time) %>%
+  mutate(lastEvent = lag(event))
+## Overall number of ruptures and mean AAA size at rupture
+ruptures %>%
+  filter(event=="rupture") %>%
+  group_by(treatmentGroup) %>%
+  summarise( n = n(), meanAAASize = mean(AAASize))
+## Same, but grouped by last known event
+ruptures %>%
+  filter(event=="rupture") %>%
+  group_by(treatmentGroup, lastEvent) %>%
+  summarise( n = n(), meanAAASize = mean(AAASize)) %>%
+  arrange(treatmentGroup, meanAAASize)
+
 
 ## AAA_DES is a wrapper for the function processPersons and usually calls it twice, first to get absolute effects for the control group, then to get incremental effects (between invited and control)
 ## If we are only interested in the incremental effects we can run the model faster by specifying incrementalOnly = TRUE
