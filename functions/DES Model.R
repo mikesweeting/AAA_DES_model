@@ -2153,8 +2153,8 @@ eventsPlot<-function(data,event,v1other){
          v1other$aortaDiameterThresholds[[1]][1])
   
   inter.thresh<-ifelse(!is.list(v1other$aortaDiameterThresholds), 
-                       v1other$aortaDiameterThreshold[length(v1other$aortaDiameterThresholds)],
-                       v1other$aortaDiameterThreshold[[1]][length(v1other$aortaDiameterThresholds)])
+                       v1other$aortaDiameterThresholds[length(v1other$aortaDiameterThresholds)],
+                       v1other$aortaDiameterThresholds[[1]][length(v1other$aortaDiameterThresholds[[1]])])
                        
   # ggplot(data,aes(x=time,y=AAASize))+
   #   stat_density2d(aes(alpha=..level..), geom="polygon")+facet_wrap(~treatmentGroup)+
