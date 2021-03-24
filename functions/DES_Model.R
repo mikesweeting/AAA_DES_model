@@ -76,7 +76,7 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
                     personData = NULL){
   
   # Source auxiliary functions
-  source("functions/Auxiliary Functions.R", local = T)
+  source("functions/Auxiliary_Functions.R", local = T)
   
   # Set unspecified elements of v0 to default values, if necessary. 
   v0 <- setUnspecifiedElementsOfv0(v0)
@@ -464,7 +464,7 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
 processPersons <- function(v0, v1other, v2, personData=NULL) {
 	
   # Source auxiliary functions
-  source("functions/Auxiliary Functions.R", local = T)
+  source("functions/Auxiliary_Functions.R", local = T)
   
   ## Install required packages if not already installed
   list.of.packages <- c("doParallel", "msm")
@@ -684,7 +684,7 @@ processPersonsAboveDiagnosisThreshold <- function(v0, v1other, v2,
 		threshold=3.0, personData) {
 	
   # Source auxiliary functions
-  source("functions/Auxiliary Functions.R", local = T)
+  source("functions/Auxiliary_Functions.R", local = T)
   
   # Set unspecified elements of v0 to default values, if necessary. 
   v0 <- setUnspecifiedElementsOfv0(v0)
@@ -884,7 +884,7 @@ print.compactList <- function(x, ...) {
 psa <- function(v0, v1other, v1distributions, v2values, personData=NULL) {
 	
   # Source auxiliary functions
-  source("functions/Auxiliary Functions.R", local = T)
+  source("functions/Auxiliary_Functions.R", local = T)
   
   # Set elements of v0 as needed for PSA. 
 	v0 <- setUnspecifiedElementsOfv0(v0)  
@@ -1001,7 +1001,7 @@ psaAboveDiagnosisThreshold <- function(v0, v1other, v1distributions, v2values,
                                        threshold=3.0, personData=NULL) {
 	
   # Source auxiliary functions
-  source("functions/Auxiliary Functions.R", local = T)
+  source("functions/Auxiliary_Functions.R", local = T)
   
   # Set elements of v0 as needed for PSA. 
 	v0 <- setUnspecifiedElementsOfv0(v0)  

@@ -9,7 +9,7 @@ library(parallel)
 this.dir <- dirname(parent.frame(2)$ofile)
 setwd(paste0(this.dir,"/../../"))
 
-source("functions/DES Model.R")
+source("functions/DES_Model.R")
 
 # Parameters.
 ## There are two ways to load in the parameters. 
