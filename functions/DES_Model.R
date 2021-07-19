@@ -461,7 +461,7 @@ AAA_DES <- function(dataFile, psa = FALSE, n = 10000, nPSA = 100, selectiveSampl
 #   stored all these quantities in a 3D array, called "personsQuantities",
 #   instead of a list.) 
 ################################################################################
-processPersons <- function(v0, v1other, v2, personData=NULL) {
+processPersons <- function(v0, v1other, v2, personData=NULL, debug = F) {
 	
   # Source auxiliary functions
   source("functions/Auxiliary_Functions.R", local = T)
@@ -509,6 +509,9 @@ processPersons <- function(v0, v1other, v2, personData=NULL) {
 	  personData <- data.frame(startAge = v1other$startAge)
     v1other$startAge <- NULL
 	}
+	if(is.null(personData$startAge) & is.null(v1other$startAge)) {
+	  stop("Must provide startAge either in personData (recommended) or in v1other$startAge")
+	}
 	## If prob (probability weighting) does not exist in personData then assign it the value 1
 	if(is.null(personData$prob)){
 	  personData$prob <- 1
@@ -548,6 +551,7 @@ processPersons <- function(v0, v1other, v2, personData=NULL) {
 	## MS: 24/05/20. This will allow individuals to have different starting ages
 	if (v1other$nonAaaDeathMethod == "mass") {
 		v1other$nonAaaSurvProbs <- getMassSurvivalProbabilities()
+		v1other$nonAaaSurvProbs$age <- personData$startAge + v1other$nonAaaSurvProbs$followUpAtLeast
 	} else if (v1other$nonAaaDeathMethod == "onsIntegerStart") { 
 		v1other$nonAaaSurvProbs <- convertMortalityRatesToSurvProbs(
 				min(personData$startAge), v1other$nonAaaMortalityRatesFileName)
@@ -612,6 +616,9 @@ processPersons <- function(v0, v1other, v2, personData=NULL) {
 
 	# Create and analyze the persons. Pass all variables to processOnePair
 	if (v0$method == "serial") {
+    if(debug == T){
+        browser()	
+    }
 		setAndShowRandomSeed(v0$randomSeed, verbose=v0$verbose)
 		resultForEachPerson <- lapply(X=1:v0$numberOfPersons, 
 				FUN=processOnePair, v0, v1other, v2, personData)

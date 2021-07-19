@@ -14,21 +14,6 @@
 processOnePair <- function(personNumber, v0, v1other, v2, personData) {
   #cat(personNumber, "\n")
   
-  # Check the arguments.
-  if (!("namesOfQuantities" %in% names(v0)))
-    stop("processOnePair needs v0$namesOfQuantities to exist;",
-         "\nthis is normally done by processPersons or psa")
-  if (v1other$nonAaaDeathMethod %in% c("mass", "onsIntegerStart") && 
-      !("nonAaaSurvProbs" %in% names(v1other)))
-    stop("when v1other$nonAaaDeathMethod is \"", v1other$nonAaaDeathMethod, "\", ",
-         "processOnePair needs \nv1other$nonAaaSurvProbs ",
-         "to exist; this is normally done by processPersons")
-  if (v1other$nonAaaDeathMethod == "onsNonintegerStart" &&
-      !("nonAaaMortalityRates" %in% names(v1other)))
-    stop("when v1other$nonAaaDeathMethod is , \"onsNonintegerStart\", ",
-         "processOnePair needs \nv1other$nonAaaMortalityRates ",
-         "to exist; this is normally done by processPersons")
-  
   # Make result, which will be returned from this function. 
   result <- list(personQuantities=
                    sapply(v0$treatmentGroups, function(x) NULL)) 
@@ -1349,7 +1334,7 @@ generateReinterventionTime <- function(rates,
 ################################################################################
 # A single function for any non-AAA death model. 
 generateTimeTillNonAaaDeath <- function(v0, v1other, startAge) {
-  ## Calculate conditional survival probabilties given patient's age
+  ## Calculate conditional survival probabilities given patient's age
   ## Probabilities are survival up to the end of that year of age
   nonAaaSurvProbs <- v1other$nonAaaSurvProbs[v1other$nonAaaSurvProbs$age >= startAge, 2] / min(v1other$nonAaaSurvProbs[v1other$nonAaaSurvProbs$age == startAge-1, 2], 1, na.rm = T)
   
@@ -1378,8 +1363,8 @@ getMassSurvivalProbabilities <- function(fileName=file.path("input/SWAN",
   fileContents <- read.csv(fileName, comment.char="#")
   names(fileContents) <- c("cycle", "followUpAtLeast", 
                            "survProbAdjustedForCensAndAaa", "probDeathInThisCycle")
-  survProbs <- fileContents$survProbAdjustedForCensAndAaa
-  survProbs[!is.na(survProbs)]
+  surv <- fileContents[,c("followUpAtLeast", "survProbAdjustedForCensAndAaa")]
+  surv[!is.na(surv$survProbAdjustedForCensAndAaa),]
 }
 
 # generateTimeTillNonAaaDeathFromSurvProbs generates a non-AAA death time
