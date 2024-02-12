@@ -847,23 +847,23 @@ print.compactList <- function(x, ...) {
 				print.compactList(element, indentSize=indentSize + 5)
 			}
 
-			} else if (length(element) < 100 && 
-				(class(element) %in% c("numeric", "logical", "character"))) {
-			if (length(element) == 0) {
-				cat(class(element), "(0)", sep="")
-			} else if (is.null(names(element))) {
-				cat(element)
-				cat(" ")
-			} else {
-				for (i in seq_along(element)) {
-					thisName <- names(element)[i]
-					cat({ if(thisName=="") "UNNAMED" else thisName }, "=", 
-							element[i], " ", sep="")
-				}
-			}
-			if (!is.null(typeAttr))
-				cat("[type=", typeAttr, "] ", sep="")
-			cat("\n")
+		} else if (length(element) < 100 && 
+		           any(class(element) %in% c("numeric", "logical", "character"))) {
+		  if (length(element) == 0) {
+		    cat(class(element), "(0)", sep="")
+		  } else if (is.null(names(element))) {
+		    cat(element)
+		    cat(" ")
+		  } else {
+		    for (i in seq_along(element)) {
+		      thisName <- names(element)[i]
+		      cat({ if(thisName=="") "UNNAMED" else thisName }, "=", 
+		          element[i], " ", sep="")
+		    }
+		  }
+		  if (!is.null(typeAttr))
+		    cat("[type=", typeAttr, "] ", sep="")
+		  cat("\n")
 		} else if (is.null(element)) {
 			cat("NULL\n")
 		} else {

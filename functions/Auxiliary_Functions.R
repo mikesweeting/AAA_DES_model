@@ -2778,9 +2778,10 @@ checkV2 <- function(v2) {
     "beta0", "beta1", "sigma0", "sigma1", "rho", "sigmaW", 
     "gamma", "alpha", 
     "costs", "ctMeasurementErrorSD")
-  for (varName in requiredElementsOfV2)
-    if (!(varName %in% names(v2)) || is.na(v2[[varName]]))
+  for (varName in requiredElementsOfV2){
+    if (!(varName %in% names(v2)) || any(is.na(v2[[varName]])))
       stop("v2 must contain ", varName, " and it must not be NA")
+  }
   
   # Check reintervention rates. 
   for (varName in c("reinterventionRatesAfterElectiveOpen",
@@ -2789,7 +2790,7 @@ checkV2 <- function(v2) {
                     "reinterventionRatesAfterEmergencyEvar")) {
     v2element <- v2[[varName]]
     if (is.null(v2element) || !is.numeric(v2element) || 
-        any(is.na(v2element) || any(v2element < 0))) 
+        any(is.na(v2element)) || any(v2element < 0)) 
       stop("v2element$", varName, " must be a non-negative numeric vector")
   }
   
